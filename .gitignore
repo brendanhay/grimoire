@@ -1,6 +1,9 @@
 log
 dist
 cabal-dev
+cookbooks
+tmp
+Cheffile*
 *.o
 *.hi
 *.chi
