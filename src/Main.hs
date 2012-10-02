@@ -15,8 +15,17 @@ module Main (
       main
     ) where
 
-import Snap.Http.Server  (quickHttpServe)
+import Data.Maybe        (fromJust)
+import Snap.Http.Server  (httpServe, getOther)
+import System.IO
 import Grimoire.Handlers (site)
+import Grimoire.Config   (parseConfig)
 
 main :: IO ()
-main = quickHttpServe site
+main = do
+  -- Just for development to ensure foreman flushes stdout
+  hSetBuffering stdout NoBuffering
+  conf <- parseConfig
+  print conf
+  httpServe conf $ site conf
+

@@ -6,4 +6,4 @@ Cheffile*
 *.hi
 *.chi
 *.chs.h
-
+.env

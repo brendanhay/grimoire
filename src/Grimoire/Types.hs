@@ -12,42 +12,93 @@
 
 module Grimoire.Types (
     -- * Exported Types
-      Name
+      Org
+    , UserName
+    , Password
+    , Name
     , File
+    , Auth(..)
+    , AppConfig(..)
     , Version(..)
     , Uri(..)
     , Time(..)
     , Cookbook(..)
     ) where
 
-import Data.Aeson    (ToJSON(..), object, (.=))
-import Data.List     (intercalate)
+import Control.Monad (liftM)
+import Data.Aeson    (ToJSON(..), FromJSON(..), object, (.=))
+import Data.Function (on)
+import Data.Monoid
 import Data.String   (IsString(..))
+import Data.Text     (Text)
 import Data.UnixTime (UnixTime, Format, parseUnixTimeGMT, formatUnixTimeGMT)
-import Text.Regex    (mkRegex, subRegex)
 
 import qualified Data.ByteString.Char8 as BS
 
-type Name = String
-type File = String
+type Org      = BS.ByteString
+type UserName = BS.ByteString
+type Password = BS.ByteString
+type Name     = BS.ByteString
+type File     = BS.ByteString
 
-data Version = Version String deriving (Eq, Show)
+data Auth = Auth
+    { authOrg  :: Maybe Org
+    , authUser :: Maybe UserName
+    , authPass :: Maybe Password
+    } deriving (Show)
+
+instance Monoid Auth where
+    mempty      = Auth Nothing Nothing Nothing
+    mappend a b = Auth
+        { authOrg  = ov authOrg
+        , authUser = ov authUser
+        , authPass = ov authPass
+        }
+      where
+        ov f = getLast $! (mappend `on` (Last . f)) a b
+
+data AppConfig = AppConfig
+    { auth :: Auth
+    } deriving (Show)
+
+instance Monoid AppConfig where
+    mempty      = AppConfig mempty
+    mappend a b = AppConfig
+        { auth = mappend (auth a) (auth b)
+        }
+
+data Version = Version
+    { versionStr :: BS.ByteString
+    } deriving (Eq, Show)
 
 instance IsString Version where
-    fromString str = Version $ subRegex (mkRegex "\\.") str "_"
+    fromString str = Version (BS.map fn $ BS.pack str)
+      where
+        fn '.' = '_'
+        fn c   = c
 
 instance ToJSON Version where
-    toJSON (Version str) = toJSON $ subRegex (mkRegex "_") str "."
+    toJSON (Version str) = toJSON $ BS.map fn str
+      where
+        fn '_' = '.'
+        fn c   = c
 
-data Uri = Uri Name Version deriving (Eq, Show)
+data Uri = Uri
+    { uriHost     :: BS.ByteString
+    , uriPort     :: Int
+    , uriCookbook :: Name
+    , uriVersion  :: Version
+    } deriving (Eq, Show)
 
 instance ToJSON Uri where
-    toJSON (Uri name (Version version)) = toJSON $ intercalate "/" lst
+    toJSON Uri{..} = toJSON $ BS.intercalate "/" lst
       where
-         lst = [ "http://localhost:7000/cookbooks"
-               , name
+         lst = [ "http:/"
+               , BS.concat [uriHost, ":", BS.pack $ show uriPort]
+               , "cookbooks"
+               , uriCookbook
                , "versions"
-               , version
+               , versionStr uriVersion
                ]
 
 data Time = Time UnixTime deriving (Eq, Show)
@@ -58,45 +109,43 @@ instance IsString Time where
 instance ToJSON Time where
     toJSON (Time utime) = toJSON $ formatUnixTimeGMT timeFormat utime
 
+instance FromJSON Time where
+    parseJSON j = liftM (Time . parseUnixTimeGMT "%Y-%m-%dT%H:%M:%SZ") (parseJSON j)
+
 data Cookbook =
     Overview
     { name          :: Name
-    , latestVersion :: Uri
+    , description   :: BS.ByteString
+    , latestVersion :: Maybe Uri
     , versions      :: [Uri]
+    , maintainer    :: UserName
     , createdAt     :: Time
     , updatedAt     :: Time
     }
-  | Specific
+ |  Revision
     { cookbook  :: Uri
     , file      :: File
     , version   :: Version
     , createdAt :: Time
     , updatedAt :: Time
-    }
-  deriving (Eq, Show)
+    } deriving (Eq, Show)
 
 instance ToJSON Cookbook where
     toJSON Overview{..} = object
-        [ "name"              .= name
-        , "latest_version"    .= latestVersion
-        , "versions"          .= versions
-        , "description"       .= ("description" :: String)
-        , "external_url"      .= ("github.com/soundcloud/system" :: String)
-        , "maintainer"        .= ("brendan" :: String)
-        , "category"          .= ("stuff" :: String)
-        , "average_rating"    .= ("5" :: String)
-        , "updated_at"        .= updatedAt
-        , "created_at"        .= createdAt
+        [ "name"           .= name
+        , "latest_version" .= latestVersion
+        , "versions"       .= versions
+        , "description"    .= description
+        , "maintainer"     .= maintainer
+        , "updated_at"     .= updatedAt
+        , "created_at"     .= createdAt
         ]
-    toJSON Specific{..} = object
-        [ "cookbook"          .= cookbook
-        , "file"              .= file
-        , "tarball_file_size" .= ("45248" :: String)
-        , "version"           .= version
-        , "license"           .= ("Apache 2.0" :: String)
-        , "average_rating"    .= ("null" :: String)
-        , "updated_at"        .= updatedAt
-        , "created_at"        .= createdAt
+    toJSON Revision{..} = object
+        [ "cookbook"   .= cookbook
+        , "file"       .= file
+        , "version"    .= version
+        , "updated_at" .= updatedAt
+        , "created_at" .= createdAt
         ]
 
 --

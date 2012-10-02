@@ -15,57 +15,74 @@ module Grimoire.Handlers (
       site
     ) where
 
-import Control.Monad  (liftM)
-import Data.Aeson     (ToJSON, encode)
-import Data.String    (IsString(..))
+import Control.Monad.IO.Class (liftIO)
+import Control.Monad          (liftM)
+import Data.Aeson             (encode)
+import Data.Maybe             (fromJust)
+import Data.String            (IsString(..))
 import Snap.Core
+import Snap.Http.Server
+import Grimoire.GitHub
 import Grimoire.Types
 
 import qualified Data.ByteString.Char8 as BS
 
-site :: Snap ()
-site = method GET $ route
-    [ ("cookbooks/:name", jsonResponse overview)
-    , ("cookbooks/:name/versions/:version", jsonResponse specific)
-    ]
+site :: Config m AppConfig -> Snap ()
+site conf = method GET . route $ map json routes
+  where
+    json (u, r) = (u, r conf >>= writeLBS . encode)
 
 --
 -- Private
 --
 
-overview :: Snap Cookbook
-overview = do
+routes :: [(BS.ByteString, Config m AppConfig -> Snap Cookbook)]
+routes = [ ("cookbooks/:name", overview)
+         , ("cookbooks/:name/versions/:version", revision)
+         ]
+
+overview :: Config m AppConfig -> Snap Cookbook
+overview conf = do
     name <- requireParam "name"
-    return Overview
-        { name          = name
-        , latestVersion = Uri name "2.0.0"
-        , versions      = [Uri name "1.0.0", Uri name "2.0.0"]
-        , createdAt     = "2009-09-26T00:51:36Z"
-        , updatedAt     = "2009-09-26T00:51:36Z"
+    rep  <- gitHub (repo name) conf
+    ver  <- gitHub (vers name) conf
+    return $ result (fromJust rep) ver
+  where
+    result Repository{..} v = Overview
+        { name          = repoName
+        , description   = repoDescription
+        , latestVersion = latest conf repoName v
+        , versions      = map (uri conf repoName) v
+        , maintainer    = repoOwner
+        , createdAt     = repoCreated
+        , updatedAt     = repoUpdated
         }
 
-specific :: Snap Cookbook
-specific = do
+revision :: Config m AppConfig -> Snap Cookbook
+revision conf = do
     name    <- requireParam "name"
-    version <- requireParam "version"
-    return Specific
-        { cookbook  = Uri name version
-        , file      = "http://s3.amazonaws.com/community-files.opscode.com/cookbook_versions/tarballs/2105/original/apache2.tgz"
-        , version   = version
-        , createdAt = "2009-09-26T00:51:36Z"
-        , updatedAt = "2009-09-26T00:51:36Z"
+    -- version <- requireParam "version"
+    rep  <- gitHub (repo name) conf
+    ver  <- gitHub (vers name) conf
+    return $ result (fromJust rep) ver
+  where
+    result Repository{..} v = Revision
+        { cookbook  = fromJust $ latest conf repoName v
+        , file      = "" -- BS.intercalate "/" ["https://github.com", org, name, "tarball", v]
+        , version   = head v
+        , createdAt = repoCreated
+        , updatedAt = repoUpdated
         }
 
---
--- Response
---
+gitHub :: (Auth -> IO a) -> Config m AppConfig -> Snap a
+gitHub f conf = liftIO $ f (auth . fromJust $ getOther conf)
 
-jsonResponse :: (Show a, ToJSON a) => Snap a -> Snap ()
-jsonResponse res = res >>= writeLBS . encode
+latest :: Config m AppConfig -> Name -> [Version] -> Maybe Uri
+latest _ _ []       = Nothing
+latest conf n (x:_) = Just $ uri conf n x
 
---
--- Params
---
+uri :: Config m AppConfig -> Name -> Version -> Uri
+uri conf n v = Uri (fromJust $ getHostname conf) (fromJust $ getPort conf) n v
 
 class RequiredParam a where
     requireParam :: BS.ByteString -> Snap a
