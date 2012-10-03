@@ -37,7 +37,7 @@ import qualified Data.ByteString.Lazy.Char8 as BL
 data Repository = Repository
    { repoName        :: BS.ByteString
    , repoDescription :: BS.ByteString
-   , repoOwner       :: UserName
+   , repoOwner       :: User
    , repoCreated     :: Time
    , repoUpdated     :: Time
    , repoUrl         :: BS.ByteString
@@ -70,7 +70,7 @@ instance FromJSON Tag where
 
 repo :: BS.ByteString -> Auth -> IO (Maybe Repository)
 repo name a = do
-    body <- request (BS.intercalate "/" ["repos", _authOrg a, name]) a
+    body <- request (BS.intercalate "/" ["repos", org a, name]) a
     return (decode' body :: Maybe Repository)
 
 vers :: BS.ByteString -> Auth -> IO [Version]
@@ -80,7 +80,7 @@ vers name a = do
 
 tags :: BS.ByteString -> Auth -> IO [Tag]
 tags name a = do
-    body <- request (BS.intercalate "/" ["repos", _authOrg a, name, "tags"]) a
+    body <- request (BS.intercalate "/" ["repos", org a, name, "tags"]) a
     return $ case decode' body :: Maybe (Vector Tag) of
         Just v  -> toList v
         Nothing -> []
@@ -95,8 +95,8 @@ request path a = withManager $ \manager -> do
     return body
 
 uri :: BS.ByteString -> Auth -> Request m
-uri path Auth{..} = case parseUrl $ BS.unpack url of
-    Just r  -> applyBasicAuth _authUser _authPass r
+uri path a = case parseUrl $ BS.unpack url of
+    Just r  -> applyBasicAuth (user a) (pass a) r
     Nothing -> error "Invalid request"
   where
     url = BS.concat [base, path]

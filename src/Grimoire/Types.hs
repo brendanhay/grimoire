@@ -14,11 +14,11 @@
 
 module Grimoire.Types (
     -- * Exported Types
-      Org
-    , UserName
-    , Password
-    , Name
+      Name
     , File
+    , Org(..)
+    , User(..)
+    , Password(..)
     , Auth(..)
     , AppConfig(..)
     , Uri(..)
@@ -33,6 +33,11 @@ module Grimoire.Types (
     , authOrg
     , authUser
     , authPass
+
+    -- * Accessors
+    , org
+    , user
+    , pass
     ) where
 
 import Control.Monad (liftM)
@@ -41,28 +46,76 @@ import Data.Function (on)
 import Control.Lens hiding ((.=))
 import Data.Monoid
 import Data.String   (IsString(..))
-import Data.Text     (Text)
 import Data.UnixTime (UnixTime, Format, parseUnixTimeGMT, formatUnixTimeGMT)
 
 import qualified Data.ByteString.Char8 as BS
 
-type Org      = BS.ByteString
-type UserName = BS.ByteString
-type Password = BS.ByteString
-type Name     = BS.ByteString
-type File     = BS.ByteString
+type Name = BS.ByteString
+type File = BS.ByteString
+
+data Org = Org BS.ByteString
+    deriving (Show, Eq)
+
+instance Monoid Org where
+    mempty  = "organisation"
+    mappend = mappend'
+
+instance IsString Org where
+    fromString = Org . fromString
+
+data User = User Name
+    deriving (Show, Eq)
+
+instance Monoid User where
+    mempty  = "user"
+    mappend = mappend'
+
+instance IsString User where
+    fromString = User . fromString
+
+instance ToJSON User where
+    toJSON (User s) = toJSON s
+
+instance FromJSON User where
+    parseJSON j = parseJSON j >>= return . User
+
+data Password = Password BS.ByteString
+    deriving (Show, Eq)
+
+instance Monoid Password where
+    mempty  = "password"
+    mappend = mappend'
+
+mappend' :: (Monoid m, Eq m) => m -> m -> m
+mappend' a b | a == mempty = b
+             | b == mempty = a
+             | otherwise   = b
+
+instance IsString Password where
+    fromString = Password . fromString
 
 data Auth = Auth
     { _authOrg  :: Org
-    , _authUser :: UserName
+    , _authUser :: User
     , _authPass :: Password
     } deriving (Show)
 
 $(makeLenses ''Auth)
 
+org, user, pass :: Auth -> BS.ByteString
+org  Auth{..} = o where Org o      = _authOrg
+user Auth{..} = u where User u     = _authUser
+pass Auth{..} = p where Password p = _authPass
+
 instance Monoid Auth where
-    mempty             = Auth "org" "user" "pass"
-    mappend Auth{..} _ = Auth _authOrg _authUser _authPass
+    mempty      = Auth mempty mempty mempty
+    mappend a b = Auth
+        { _authOrg  = ov _authOrg
+        , _authUser = ov _authUser
+        , _authPass = ov _authPass
+        }
+      where
+        ov f = (mappend `on` f) a b
 
 data AppConfig = AppConfig
     { _auth :: Auth
@@ -121,13 +174,16 @@ instance ToJSON Time where
 instance FromJSON Time where
     parseJSON j = liftM (Time . parseUnixTimeGMT "%Y-%m-%dT%H:%M:%SZ") (parseJSON j)
 
+timeFormat :: Format
+timeFormat = "%Y-%m-%dT%H:%M:%SZ"
+
 data Cookbook =
     Overview
     { name          :: Name
     , description   :: BS.ByteString
     , latestVersion :: Maybe Uri
     , versions      :: [Uri]
-    , maintainer    :: UserName
+    , maintainer    :: User
     , createdAt     :: Time
     , updatedAt     :: Time
     }
@@ -156,10 +212,3 @@ instance ToJSON Cookbook where
         , "updated_at" .= updatedAt
         , "created_at" .= createdAt
         ]
-
---
--- Private
---
-
-timeFormat :: Format
-timeFormat = "%Y-%m-%dT%H:%M:%SZ"

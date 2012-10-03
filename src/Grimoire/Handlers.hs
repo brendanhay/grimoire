@@ -102,4 +102,3 @@ instance RequiredParam BS.ByteString where
                 modifyResponse $ setResponseStatus 400 ("Missing param " `BS.append` name)
                 writeBS "400 Missing param"
                 getResponse >>= finishWith
-

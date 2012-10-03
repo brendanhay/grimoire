@@ -26,6 +26,7 @@ main = do
   -- Just for development to ensure foreman flushes stdout
   hSetBuffering stdout NoBuffering
   conf <- parseConfig
+  print $ getOther conf
   print conf
   httpServe conf $ site conf
 

@@ -7,3 +7,4 @@ Cheffile*
 *.chi
 *.chs.h
 .env
+tmp

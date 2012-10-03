@@ -18,18 +18,17 @@ module Grimoire.Config (
 import Control.Lens          ((.~))
 import Data.Monoid
 import Data.Maybe            (fromMaybe)
+import Data.String
 import Snap.Core             (MonadSnap)
 import Snap.Http.Server
 import System.Console.GetOpt
 import Grimoire.Types
 
-import qualified Data.ByteString.Char8 as BS
-
 parseConfig :: MonadSnap m => IO (Config m AppConfig)
-parseConfig = extendedCommandLineConfig flags' mappend defaults
+parseConfig = extendedCommandLineConfig
+    (flags (fromMaybe mempty $ getOther def) ++ optDescrs def) mappend def
   where
-    defaults = emptyConfig
-    flags'   = flags (fromMaybe mempty $ getOther defaults) ++ optDescrs defaults
+    def = emptyConfig
 
 --
 -- Private
@@ -37,16 +36,13 @@ parseConfig = extendedCommandLineConfig flags' mappend defaults
 
 flags :: AppConfig -> [OptDescr (Maybe (Config m AppConfig))]
 flags conf@AppConfig{..} = map (fmapOpt $ fmap (`setOther` mempty))
-    [ Option [] ["github-org"]
-          (ReqArg (upd authOrg . BS.pack) "ORG")
+    [ Option [] ["github-org"] (ReqArg (upd authOrg) "ORG")
           $ "github org" ++ text _authOrg
-    , Option [] ["github-user"]
-          (ReqArg (upd authUser . BS.pack) "USER")
+    , Option [] ["github-user"] (ReqArg (upd authUser) "USER")
           $ "github user" ++ text _authUser
-    , Option [] ["github-pass"]
-          (ReqArg (upd authPass . BS.pack) "PASS")
+    , Option [] ["github-pass"] (ReqArg (upd authPass) "PASS")
           $ "github password" ++ text _authPass
     ]
   where
-    upd l v = Just $ (auth . l .~ v) conf
+    upd l s = Just $ (auth . l .~ fromString s) conf
     text f  = (", default " ++) . show $ f _auth
