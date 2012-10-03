@@ -19,10 +19,12 @@ module Grimoire.Types (
     , File
     , Auth(..)
     , AppConfig(..)
-    , Version(..)
     , Uri(..)
     , Time(..)
     , Cookbook(..)
+
+    -- * Restricted Constructors
+    , Version
     ) where
 
 import Control.Monad (liftM)
@@ -72,13 +74,13 @@ data Version = Version
     } deriving (Eq, Show)
 
 instance IsString Version where
-    fromString str = Version (BS.map fn $ BS.pack str)
+    fromString s = Version (BS.map fn $ BS.pack s)
       where
         fn '.' = '_'
         fn c   = c
 
 instance ToJSON Version where
-    toJSON (Version str) = toJSON $ BS.map fn str
+    toJSON (Version s) = toJSON $ BS.map fn s
       where
         fn '_' = '.'
         fn c   = c

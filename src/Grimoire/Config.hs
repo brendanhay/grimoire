@@ -48,3 +48,19 @@ flags conf@AppConfig{..} = map (fmapOpt $ fmap (`setOther` mempty))
     ]
   where
     text f = maybe "" ((", default " ++) . show) $ f auth
+
+
+flags :: AppConfig -> [OptDescr (Maybe (Config m AppConfig))]
+flags conf@AppConfig{..} = map (fmapOpt $ fmap (`setOther` mempty))
+    [ Option [] ["github-org"]
+          (ReqArg (\s -> Just $ conf { auth = mempty { authOrg = Just $ BS.pack s } }) "ORG")
+          $ "github org" ++ text authOrg
+    , Option [] ["github-user"]
+          (ReqArg (\s -> Just $ conf { auth = mempty { authUser = Just $ BS.pack s } }) "USER")
+          $ "github user" ++ text authUser
+    , Option [] ["github-pass"]
+          (ReqArg (\s -> Just $ conf { auth = mempty { authPass = Just $ BS.pack s } }) "PASS")
+          $ "github pass" ++ text authPass
+    ]
+  where
+    text f = maybe "" ((", default " ++) . show) $ f auth

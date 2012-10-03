@@ -22,6 +22,7 @@ module Grimoire.GitHub (
     , tags
     ) where
 
+import Data.String
 import Control.Applicative         ((<$>), (<*>), empty)
 import Data.Aeson                  (decode')
 import Data.Aeson.Types
@@ -77,7 +78,7 @@ repo name auth = do
 vers :: BS.ByteString -> Auth -> IO [Version]
 vers name auth = do
     tags' <- tags name auth
-    return . map (Version . tagName) $ sort tags'
+    return . map (fromString . BS.unpack . tagName) $ sort tags'
 
 tags :: BS.ByteString -> Auth -> IO [Tag]
 tags name auth = do

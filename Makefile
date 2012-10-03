@@ -6,10 +6,11 @@ CABAL=`which cabal-dev`
 
 .PHONY: build conf clean
 
-all: build
+all:
+	$(CABAL) install
 
 build:
-	$(CABAL) install
+	$(CABAL) build
 
 conf:
 	$(CABAL) configure
