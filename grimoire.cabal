@@ -21,7 +21,6 @@ Executable grimoire
                     , RecordWildCards
                     , TypeSynonymInstances
                     , FlexibleInstances
-                    , DeriveGeneric
 
   build-depends:      base
                     , ghc-prim
@@ -36,6 +35,7 @@ Executable grimoire
                     , aeson
                     , vector
                     , http-conduit
+                    , lens
 
   if impl(ghc >= 6.12.0)
     ghc-options:      -threaded

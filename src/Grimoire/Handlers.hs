@@ -75,7 +75,7 @@ revision conf = do
         }
 
 gitHub :: (Auth -> IO a) -> Config m AppConfig -> Snap a
-gitHub f conf = liftIO $ f (auth . fromJust $ getOther conf)
+gitHub f conf = liftIO $ f (_auth . fromJust $ getOther conf)
 
 latest :: Config m AppConfig -> Name -> [Version] -> Maybe Uri
 latest _ _ []       = Nothing

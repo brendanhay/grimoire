@@ -1,3 +1,5 @@
+{-# LANGUAGE TemplateHaskell #-}
+
 -- |
 -- Module      : Grimoire.Types
 -- Copyright   : (c) 2012 Brendan Hay <brendan@soundcloud.com>
@@ -25,11 +27,18 @@ module Grimoire.Types (
 
     -- * Restricted Constructors
     , Version
+
+    -- * Lenses
+    , auth
+    , authOrg
+    , authUser
+    , authPass
     ) where
 
 import Control.Monad (liftM)
 import Data.Aeson    (ToJSON(..), FromJSON(..), object, (.=))
 import Data.Function (on)
+import Control.Lens hiding ((.=))
 import Data.Monoid
 import Data.String   (IsString(..))
 import Data.Text     (Text)
@@ -44,29 +53,27 @@ type Name     = BS.ByteString
 type File     = BS.ByteString
 
 data Auth = Auth
-    { authOrg  :: Org
-    , authUser :: UserName
-    , authPass :: Password
+    { _authOrg  :: Org
+    , _authUser :: UserName
+    , _authPass :: Password
     } deriving (Show)
+
+$(makeLenses ''Auth)
 
 instance Monoid Auth where
-    mempty      = Auth "org" "user" "pass"
-    mappend a b = Auth
-        { authOrg  = ov authOrg
-        , authUser = ov authUser
-        , authPass = ov authPass
-        }
-      where
-        ov f = getLast $! (mappend `on` (Last . f)) a b
+    mempty             = Auth "org" "user" "pass"
+    mappend Auth{..} _ = Auth _authOrg _authUser _authPass
 
 data AppConfig = AppConfig
-    { auth :: Auth
+    { _auth :: Auth
     } deriving (Show)
+
+$(makeLenses ''AppConfig)
 
 instance Monoid AppConfig where
     mempty      = AppConfig mempty
     mappend a b = AppConfig
-        { auth = mappend (auth a) (auth b)
+        { _auth = mappend (_auth a) (_auth b)
         }
 
 data Version = Version

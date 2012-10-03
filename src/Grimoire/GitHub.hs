@@ -27,8 +27,6 @@ import Control.Applicative         ((<$>), (<*>), empty)
 import Data.Aeson                  (decode')
 import Data.Aeson.Types
 import Data.List                   (sort)
-import Data.Maybe                  (fromJust)
-import Data.Text                   (Text)
 import Data.Vector                 (Vector, toList)
 import Network.HTTP.Conduit hiding (queryString, path)
 import Grimoire.Types
@@ -71,18 +69,18 @@ instance FromJSON Tag where
 --
 
 repo :: BS.ByteString -> Auth -> IO (Maybe Repository)
-repo name auth = do
-    body <- request (BS.intercalate "/" ["repos", org auth, name]) auth
+repo name a = do
+    body <- request (BS.intercalate "/" ["repos", _authOrg a, name]) a
     return (decode' body :: Maybe Repository)
 
 vers :: BS.ByteString -> Auth -> IO [Version]
-vers name auth = do
-    tags' <- tags name auth
+vers name a = do
+    tags' <- tags name a
     return . map (fromString . BS.unpack . tagName) $ sort tags'
 
 tags :: BS.ByteString -> Auth -> IO [Tag]
-tags name auth = do
-    body <- request (BS.intercalate "/" ["repos", org auth, name, "tags"]) auth
+tags name a = do
+    body <- request (BS.intercalate "/" ["repos", _authOrg a, name, "tags"]) a
     return $ case decode' body :: Maybe (Vector Tag) of
         Just v  -> toList v
         Nothing -> []
@@ -92,25 +90,16 @@ tags name auth = do
 --
 
 request :: BS.ByteString -> Auth -> IO BL.ByteString
-request path auth = withManager $ \manager -> do
-    Response _ _ _ body <- httpLbs (uri path auth) manager
+request path a = withManager $ \manager -> do
+    Response _ _ _ body <- httpLbs (uri path a) manager
     return body
 
 uri :: BS.ByteString -> Auth -> Request m
-uri path auth = case parseUrl $ BS.unpack url of
-    Just r  -> applyBasicAuth (user auth) (pass auth) r
+uri path Auth{..} = case parseUrl $ BS.unpack url of
+    Just r  -> applyBasicAuth _authUser _authPass r
     Nothing -> error "Invalid request"
   where
     url = BS.concat [base, path]
 
 base :: BS.ByteString
 base = "https://api.github.com/"
-
-org :: Auth -> Org
-org = fromJust . authOrg
-
-user :: Auth -> UserName
-user = fromJust . authUser
-
-pass :: Auth -> Password
-pass = fromJust . authPass

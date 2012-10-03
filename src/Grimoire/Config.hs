@@ -15,6 +15,7 @@ module Grimoire.Config (
       parseConfig
     ) where
 
+import Control.Lens          ((.~))
 import Data.Monoid
 import Data.Maybe            (fromMaybe)
 import Snap.Core             (MonadSnap)
@@ -34,32 +35,18 @@ parseConfig = extendedCommandLineConfig flags' mappend defaults
 -- Private
 --
 
-flags :: AppConfig -> [OptDescr (Config m AppConfig)]
+flags :: AppConfig -> [OptDescr (Maybe (Config m AppConfig))]
 flags conf@AppConfig{..} = map (fmapOpt $ fmap (`setOther` mempty))
     [ Option [] ["github-org"]
-          (ReqArg (\s -> conf { auth = mempty { authOrg = BS.pack s } }) "ORG")
-          $ "github org" ++ text authOrg
+          (ReqArg (upd authOrg . BS.pack) "ORG")
+          $ "github org" ++ text _authOrg
     , Option [] ["github-user"]
-          (ReqArg (\s -> conf { auth = mempty { authUser = BS.pack s } }) "USER")
-          $ "github user" ++ text authUser
+          (ReqArg (upd authUser . BS.pack) "USER")
+          $ "github user" ++ text _authUser
     , Option [] ["github-pass"]
-          (ReqArg (\s -> conf { auth = mempty { authPass = BS.pack s } }) "PASS")
-          $ "github pass" ++ text authPass
+          (ReqArg (upd authPass . BS.pack) "PASS")
+          $ "github password" ++ text _authPass
     ]
   where
-    text f = maybe "" ((", default " ++) . show) $ f auth
-
--- flags :: AppConfig -> [OptDescr (Maybe (Config m AppConfig))]
--- flags conf@AppConfig{..} = map (fmapOpt $ fmap (`setOther` mempty))
---     [ Option [] ["github-org"]
---           (ReqArg (\s -> Just $ conf { auth = mempty { authOrg = Just $ BS.pack s } }) "ORG")
---           $ "github org" ++ text authOrg
---     , Option [] ["github-user"]
---           (ReqArg (\s -> Just $ conf { auth = mempty { authUser = Just $ BS.pack s } }) "USER")
---           $ "github user" ++ text authUser
---     , Option [] ["github-pass"]
---           (ReqArg (\s -> Just $ conf { auth = mempty { authPass = Just $ BS.pack s } }) "PASS")
---           $ "github pass" ++ text authPass
---     ]
---   where
---     text f = maybe "" ((", default " ++) . show) $ f auth
+    upd l v = Just $ (auth . l .~ v) conf
+    text f  = (", default " ++) . show $ f _auth
