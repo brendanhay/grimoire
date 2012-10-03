@@ -22,11 +22,15 @@ module Grimoire.Types (
     , Auth(..)
     , AppConfig(..)
     , Uri(..)
+    , OverviewUri(..)
+    , RevisionUri(..)
+    , ArchiveUri(..)
     , Time(..)
     , Cookbook(..)
+    , Version(..)
 
-    -- * Restricted Constructors
-    , Version
+    -- * Type Classes
+    , SafeUri(..)
 
     -- * Lenses
     , auth
@@ -35,9 +39,9 @@ module Grimoire.Types (
     , authPass
 
     -- * Accessors
-    , org
-    , user
-    , pass
+    , orgStr
+    , userStr
+    , passStr
     ) where
 
 import Control.Monad (liftM)
@@ -49,16 +53,17 @@ import Data.String   (IsString(..))
 import Data.UnixTime (UnixTime, Format, parseUnixTimeGMT, formatUnixTimeGMT)
 
 import qualified Data.ByteString.Char8 as BS
+import qualified Data.ByteString.Lazy.Char8 as BL
 
 type Name = BS.ByteString
-type File = BS.ByteString
+type File = BL.ByteString
 
 data Org = Org BS.ByteString
     deriving (Show, Eq)
 
 instance Monoid Org where
     mempty  = "organisation"
-    mappend = mappend'
+    mappend = rappend
 
 instance IsString Org where
     fromString = Org . fromString
@@ -68,7 +73,7 @@ data User = User Name
 
 instance Monoid User where
     mempty  = "user"
-    mappend = mappend'
+    mappend = rappend
 
 instance IsString User where
     fromString = User . fromString
@@ -84,15 +89,15 @@ data Password = Password BS.ByteString
 
 instance Monoid Password where
     mempty  = "password"
-    mappend = mappend'
-
-mappend' :: (Monoid m, Eq m) => m -> m -> m
-mappend' a b | a == mempty = b
-             | b == mempty = a
-             | otherwise   = b
+    mappend = rappend
 
 instance IsString Password where
     fromString = Password . fromString
+
+rappend :: (Monoid m, Eq m) => m -> m -> m
+rappend a b | a == mempty = b
+             | b == mempty = a
+             | otherwise   = b
 
 data Auth = Auth
     { _authOrg  :: Org
@@ -102,10 +107,10 @@ data Auth = Auth
 
 $(makeLenses ''Auth)
 
-org, user, pass :: Auth -> BS.ByteString
-org  Auth{..} = o where Org o      = _authOrg
-user Auth{..} = u where User u     = _authUser
-pass Auth{..} = p where Password p = _authPass
+orgStr, userStr, passStr :: Auth -> BS.ByteString
+orgStr  Auth{..} = o where Org o      = _authOrg
+userStr Auth{..} = u where User u     = _authUser
+passStr Auth{..} = p where Password p = _authPass
 
 instance Monoid Auth where
     mempty      = Auth mempty mempty mempty
@@ -118,15 +123,17 @@ instance Monoid Auth where
         ov f = (mappend `on` f) a b
 
 data AppConfig = AppConfig
-    { _auth :: Auth
+    { _auth     :: Auth
+    , _cacheDir :: BS.ByteString
     } deriving (Show)
 
 $(makeLenses ''AppConfig)
 
 instance Monoid AppConfig where
-    mempty      = AppConfig mempty
+    mempty      = AppConfig mempty ".cache"
     mappend a b = AppConfig
-        { _auth = mappend (_auth a) (_auth b)
+        { _auth     = mappend (_auth a) (_auth b)
+        , _cacheDir = rappend (_cacheDir a) (_cacheDir b)
         }
 
 data Version = Version
@@ -134,34 +141,56 @@ data Version = Version
     } deriving (Eq, Show)
 
 instance IsString Version where
-    fromString s = Version (BS.map fn $ BS.pack s)
-      where
-        fn '.' = '_'
-        fn c   = c
+    fromString = Version . BS.pack
 
 instance ToJSON Version where
-    toJSON (Version s) = toJSON $ BS.map fn s
-      where
-        fn '_' = '.'
-        fn c   = c
+    toJSON (Version s) = toJSON s
+
+class SafeUri a where
+    fromUri :: a -> BS.ByteString
 
 data Uri = Uri
     { uriHost     :: BS.ByteString
     , uriPort     :: Int
     , uriCookbook :: Name
-    , uriVersion  :: Version
     } deriving (Eq, Show)
 
-instance ToJSON Uri where
-    toJSON Uri{..} = toJSON $ BS.intercalate "/" lst
+type OverviewUri = Uri
+
+data RevisionUri = RevisionUri Uri Version deriving (Eq, Show)
+data ArchiveUri  = ArchiveUri Uri Version  deriving (Eq, Show)
+
+instance SafeUri Uri where
+    fromUri Uri{..} = BS.intercalate "/"
+        [ "http:/"
+        , BS.concat [uriHost, ":", BS.pack $ show uriPort]
+        , "cookbooks"
+        , uriCookbook
+        ]
+
+instance SafeUri Version where
+    fromUri (Version s) = BS.map fn s
       where
-         lst = [ "http:/"
-               , BS.concat [uriHost, ":", BS.pack $ show uriPort]
-               , "cookbooks"
-               , uriCookbook
-               , "versions"
-               , versionStr uriVersion
-               ]
+        fn '.' = '_'
+        fn c   = c
+
+instance SafeUri RevisionUri where
+    fromUri (RevisionUri u v) = appendVersion u v
+
+instance SafeUri ArchiveUri where
+    fromUri (ArchiveUri u v) = appendVersion u v
+
+appendVersion :: Uri -> Version -> BS.ByteString
+appendVersion u v = BS.intercalate "/" [fromUri u, "cookbooks", fromUri v]
+
+instance ToJSON Uri where
+    toJSON = toJSON . fromUri
+
+instance ToJSON RevisionUri where
+    toJSON = toJSON . fromUri
+
+instance ToJSON ArchiveUri where
+    toJSON = toJSON . fromUri
 
 data Time = Time UnixTime deriving (Eq, Show)
 
@@ -181,15 +210,15 @@ data Cookbook =
     Overview
     { name          :: Name
     , description   :: BS.ByteString
-    , latestVersion :: Maybe Uri
-    , versions      :: [Uri]
+    , latestVersion :: Maybe RevisionUri
+    , versions      :: [RevisionUri]
     , maintainer    :: User
     , createdAt     :: Time
     , updatedAt     :: Time
     }
  |  Revision
-    { cookbook  :: Uri
-    , file      :: File
+    { cookbook  :: OverviewUri
+    , file      :: ArchiveUri
     , version   :: Version
     , createdAt :: Time
     , updatedAt :: Time

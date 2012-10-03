@@ -20,6 +20,7 @@ module Grimoire.GitHub (
     , repo
     , vers
     , tags
+    , tarball
     ) where
 
 import Data.String
@@ -31,6 +32,7 @@ import Data.Vector                 (Vector, toList)
 import Network.HTTP.Conduit hiding (queryString, path)
 import Grimoire.Types
 
+import qualified Data.Conduit as C
 import qualified Data.ByteString.Char8      as BS
 import qualified Data.ByteString.Lazy.Char8 as BL
 
@@ -68,35 +70,51 @@ instance FromJSON Tag where
 -- API
 --
 
-repo :: BS.ByteString -> Auth -> IO (Maybe Repository)
-repo name a = do
-    body <- request (BS.intercalate "/" ["repos", org a, name]) a
+repo :: Name -> Auth -> IO (Maybe Repository)
+repo n a = do
+    body <- request (BS.intercalate "/" ["repos", orgStr a, n]) a
     return (decode' body :: Maybe Repository)
 
-vers :: BS.ByteString -> Auth -> IO [Version]
-vers name a = do
-    tags' <- tags name a
+vers :: Name -> Auth -> IO [Version]
+vers n a = do
+    tags' <- tags n a
     return . map (fromString . BS.unpack . tagName) $ sort tags'
 
-tags :: BS.ByteString -> Auth -> IO [Tag]
-tags name a = do
-    body <- request (BS.intercalate "/" ["repos", org a, name, "tags"]) a
+tags :: Name -> Auth -> IO [Tag]
+tags n a = do
+    body <- request (BS.intercalate "/" ["repos", orgStr a, n, "tags"]) a
     return $ case decode' body :: Maybe (Vector Tag) of
         Just v  -> toList v
         Nothing -> []
+
+tarball :: Name
+        -> Version
+        -> Auth
+        -> C.Sink BS.ByteString (C.ResourceT IO) ()
+        -> IO ()
+tarball n v a sink = (withManager $ \m -> do
+    res <- http (uri u a) m
+    responseBody res C.$$+- sink)
+  where
+    u = BS.intercalate "/" [ "https://github.com"
+                           , orgStr a
+                           , n
+                           , "tarball"
+                           , versionStr v
+                           ]
 
 --
 -- Private
 --
 
 request :: BS.ByteString -> Auth -> IO BL.ByteString
-request path a = withManager $ \manager -> do
-    Response _ _ _ body <- httpLbs (uri path a) manager
+request path a = withManager $ \m -> do
+    Response _ _ _ body <- httpLbs (uri path a) m
     return body
 
 uri :: BS.ByteString -> Auth -> Request m
 uri path a = case parseUrl $ BS.unpack url of
-    Just r  -> applyBasicAuth (user a) (pass a) r
+    Just r  -> applyBasicAuth (userStr a) (passStr a) r
     Nothing -> error "Invalid request"
   where
     url = BS.concat [base, path]

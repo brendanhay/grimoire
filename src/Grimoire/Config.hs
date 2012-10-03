@@ -24,6 +24,8 @@ import Snap.Http.Server
 import System.Console.GetOpt
 import Grimoire.Types
 
+import qualified Data.ByteString.Char8 as BS
+
 parseConfig :: MonadSnap m => IO (Config m AppConfig)
 parseConfig = extendedCommandLineConfig
     (flags (fromMaybe mempty $ getOther def) ++ optDescrs def) mappend def
@@ -41,6 +43,8 @@ flags conf@AppConfig{..} = map (fmapOpt $ fmap (`setOther` mempty))
     , Option [] ["github-user"] (ReqArg (upd authUser) "USER")
           $ "github user" ++ text _authUser
     , Option [] ["github-pass"] (ReqArg (upd authPass) "PASS")
+          $ "github password" ++ text _authPass
+    , Option [] ["cache-dir"] (ReqArg (\s -> Just $ conf { _cacheDir = BS.pack s }) "DIR")
           $ "github password" ++ text _authPass
     ]
   where

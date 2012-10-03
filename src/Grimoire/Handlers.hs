@@ -24,22 +24,26 @@ import Snap.Core
 import Snap.Http.Server
 import Grimoire.GitHub
 import Grimoire.Types
+import Grimoire.FileCache
 
 import qualified Data.ByteString.Char8 as BS
 
 site :: Config m AppConfig -> Snap ()
-site conf = method GET . route $ map json routes
+site conf = route
+    [ ("cookbooks/:name", json overview)
+    , ("cookbooks/:name/versions/:version", json revision)
+    , ("cookbooks/:name/versions/:version/archive", file archive)
+    ]
   where
-    json (u, r) = (u, r conf >>= writeLBS . encode)
+    file h = method GET $ h conf
+    json h = h conf >>= method GET . writeLBS . encode
 
 --
 -- Private
 --
 
-routes :: [(BS.ByteString, Config m AppConfig -> Snap Cookbook)]
-routes = [ ("cookbooks/:name", overview)
-         , ("cookbooks/:name/versions/:version", revision)
-         ]
+archive :: Config m AppConfig -> Snap ()
+archive conf = return ()
 
 overview :: Config m AppConfig -> Snap Cookbook
 overview conf = do
@@ -52,7 +56,7 @@ overview conf = do
         { name          = repoName
         , description   = repoDescription
         , latestVersion = latest conf repoName v
-        , versions      = map (uri conf repoName) v
+        , versions      = map (RevisionUri $ uri conf repoName) v
         , maintainer    = repoOwner
         , createdAt     = repoCreated
         , updatedAt     = repoUpdated
@@ -60,29 +64,35 @@ overview conf = do
 
 revision :: Config m AppConfig -> Snap Cookbook
 revision conf = do
-    name    <- requireParam "name"
-    -- version <- requireParam "version"
+    name <- requireParam "name"
+    ver  <- requireParam "version"
     rep  <- gitHub (repo name) conf
-    ver  <- gitHub (vers name) conf
     return $ result (fromJust rep) ver
   where
     result Repository{..} v = Revision
-        { cookbook  = fromJust $ latest conf repoName v
-        , file      = "" -- BS.intercalate "/" ["https://github.com", org, name, "tarball", v]
-        , version   = head v
+        { cookbook  = uri conf repoName
+        , file      = ArchiveUri (uri conf repoName) v
+        , version   = v
         , createdAt = repoCreated
         , updatedAt = repoUpdated
         }
 
+appConfig :: Config m AppConfig -> AppConfig
+appConfig = fromJust . getOther
+
 gitHub :: (Auth -> IO a) -> Config m AppConfig -> Snap a
-gitHub f conf = liftIO $ f (_auth . fromJust $ getOther conf)
+gitHub f conf = liftIO $ f (_auth $ appConfig conf)
 
-latest :: Config m AppConfig -> Name -> [Version] -> Maybe Uri
+latest :: Config m AppConfig -> Name -> [Version] -> Maybe RevisionUri
 latest _ _ []       = Nothing
-latest conf n (x:_) = Just $ uri conf n x
+latest conf n (v:_) = Just $ RevisionUri (uri conf n) v
 
-uri :: Config m AppConfig -> Name -> Version -> Uri
-uri conf n v = Uri (fromJust $ getHostname conf) (fromJust $ getPort conf) n v
+uri :: Config m AppConfig -> Name -> Uri
+uri conf = Uri host port
+  where
+    f g  = fromJust $ g conf
+    host = f getHostname
+    port = f getPort
 
 class RequiredParam a where
     requireParam :: BS.ByteString -> Snap a
