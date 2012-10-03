@@ -34,33 +34,32 @@ parseConfig = extendedCommandLineConfig flags' mappend defaults
 -- Private
 --
 
-flags :: AppConfig -> [OptDescr (Maybe (Config m AppConfig))]
+flags :: AppConfig -> [OptDescr (Config m AppConfig)]
 flags conf@AppConfig{..} = map (fmapOpt $ fmap (`setOther` mempty))
     [ Option [] ["github-org"]
-          (ReqArg (\s -> Just $ conf { auth = mempty { authOrg = Just $ BS.pack s } }) "ORG")
+          (ReqArg (\s -> conf { auth = mempty { authOrg = BS.pack s } }) "ORG")
           $ "github org" ++ text authOrg
     , Option [] ["github-user"]
-          (ReqArg (\s -> Just $ conf { auth = mempty { authUser = Just $ BS.pack s } }) "USER")
+          (ReqArg (\s -> conf { auth = mempty { authUser = BS.pack s } }) "USER")
           $ "github user" ++ text authUser
     , Option [] ["github-pass"]
-          (ReqArg (\s -> Just $ conf { auth = mempty { authPass = Just $ BS.pack s } }) "PASS")
+          (ReqArg (\s -> conf { auth = mempty { authPass = BS.pack s } }) "PASS")
           $ "github pass" ++ text authPass
     ]
   where
     text f = maybe "" ((", default " ++) . show) $ f auth
 
-
-flags :: AppConfig -> [OptDescr (Maybe (Config m AppConfig))]
-flags conf@AppConfig{..} = map (fmapOpt $ fmap (`setOther` mempty))
-    [ Option [] ["github-org"]
-          (ReqArg (\s -> Just $ conf { auth = mempty { authOrg = Just $ BS.pack s } }) "ORG")
-          $ "github org" ++ text authOrg
-    , Option [] ["github-user"]
-          (ReqArg (\s -> Just $ conf { auth = mempty { authUser = Just $ BS.pack s } }) "USER")
-          $ "github user" ++ text authUser
-    , Option [] ["github-pass"]
-          (ReqArg (\s -> Just $ conf { auth = mempty { authPass = Just $ BS.pack s } }) "PASS")
-          $ "github pass" ++ text authPass
-    ]
-  where
-    text f = maybe "" ((", default " ++) . show) $ f auth
+-- flags :: AppConfig -> [OptDescr (Maybe (Config m AppConfig))]
+-- flags conf@AppConfig{..} = map (fmapOpt $ fmap (`setOther` mempty))
+--     [ Option [] ["github-org"]
+--           (ReqArg (\s -> Just $ conf { auth = mempty { authOrg = Just $ BS.pack s } }) "ORG")
+--           $ "github org" ++ text authOrg
+--     , Option [] ["github-user"]
+--           (ReqArg (\s -> Just $ conf { auth = mempty { authUser = Just $ BS.pack s } }) "USER")
+--           $ "github user" ++ text authUser
+--     , Option [] ["github-pass"]
+--           (ReqArg (\s -> Just $ conf { auth = mempty { authPass = Just $ BS.pack s } }) "PASS")
+--           $ "github pass" ++ text authPass
+--     ]
+--   where
+--     text f = maybe "" ((", default " ++) . show) $ f auth

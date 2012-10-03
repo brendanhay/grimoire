@@ -44,13 +44,13 @@ type Name     = BS.ByteString
 type File     = BS.ByteString
 
 data Auth = Auth
-    { authOrg  :: Maybe Org
-    , authUser :: Maybe UserName
-    , authPass :: Maybe Password
+    { authOrg  :: Org
+    , authUser :: UserName
+    , authPass :: Password
     } deriving (Show)
 
 instance Monoid Auth where
-    mempty      = Auth Nothing Nothing Nothing
+    mempty      = Auth "org" "user" "pass"
     mappend a b = Auth
         { authOrg  = ov authOrg
         , authUser = ov authUser
