@@ -144,7 +144,10 @@ instance IsString Version where
     fromString = Version . BS.pack
 
 instance ToJSON Version where
-    toJSON (Version s) = toJSON s
+    toJSON (Version s) = toJSON $ BS.map fn s
+      where
+        fn '_' = '.'
+        fn c   = c
 
 class SafeUri a where
     fromUri :: a -> BS.ByteString
@@ -178,10 +181,10 @@ instance SafeUri RevisionUri where
     fromUri (RevisionUri u v) = appendVersion u v
 
 instance SafeUri ArchiveUri where
-    fromUri (ArchiveUri u v) = appendVersion u v
+    fromUri (ArchiveUri u v) = BS.intercalate "/" [appendVersion u v, "archive"]
 
 appendVersion :: Uri -> Version -> BS.ByteString
-appendVersion u v = BS.intercalate "/" [fromUri u, "cookbooks", fromUri v]
+appendVersion u v = BS.intercalate "/" [fromUri u, "versions", fromUri v]
 
 instance ToJSON Uri where
     toJSON = toJSON . fromUri

@@ -28,24 +28,23 @@ import Grimoire.FileCache
 
 import qualified Data.ByteString.Char8 as BS
 
-site :: Config m AppConfig -> Snap ()
-site conf = route
+type Config' = Config Snap AppConfig
+
+site :: Config' -> Snap ()
+site conf = method GET $ route
     [ ("cookbooks/:name", json overview)
     , ("cookbooks/:name/versions/:version", json revision)
     , ("cookbooks/:name/versions/:version/archive", file archive)
     ]
   where
-    file h = method GET $ h conf
-    json h = h conf >>= method GET . writeLBS . encode
+    file h = h conf
+    json h = h conf >>= writeLBS . encode
 
 --
 -- Private
 --
 
-archive :: Config m AppConfig -> Snap ()
-archive conf = return ()
-
-overview :: Config m AppConfig -> Snap Cookbook
+overview :: Config' -> Snap Cookbook
 overview conf = do
     name <- requireParam "name"
     rep  <- gitHub (repo name) conf
@@ -62,7 +61,7 @@ overview conf = do
         , updatedAt     = repoUpdated
         }
 
-revision :: Config m AppConfig -> Snap Cookbook
+revision :: Config' -> Snap Cookbook
 revision conf = do
     name <- requireParam "name"
     ver  <- requireParam "version"
@@ -77,17 +76,23 @@ revision conf = do
         , updatedAt = repoUpdated
         }
 
-appConfig :: Config m AppConfig -> AppConfig
+archive :: Config' -> Snap ()
+archive conf = do
+    name <- requireParam "name"
+    ver  <- requireParam "version"
+    serveArchive (ArchiveUri (uri conf name) ver) $ appConfig conf
+
+appConfig :: Config' -> AppConfig
 appConfig = fromJust . getOther
 
-gitHub :: (Auth -> IO a) -> Config m AppConfig -> Snap a
+gitHub :: (Auth -> IO a) -> Config' -> Snap a
 gitHub f conf = liftIO $ f (_auth $ appConfig conf)
 
-latest :: Config m AppConfig -> Name -> [Version] -> Maybe RevisionUri
+latest :: Config' -> Name -> [Version] -> Maybe RevisionUri
 latest _ _ []       = Nothing
 latest conf n (v:_) = Just $ RevisionUri (uri conf n) v
 
-uri :: Config m AppConfig -> Name -> Uri
+uri :: Config' -> Name -> Uri
 uri conf = Uri host port
   where
     f g  = fromJust $ g conf
