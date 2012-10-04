@@ -33,31 +33,30 @@ site :: Config m AppConfig -> Snap ()
 site app = do
     cache <- liftIO $ AC.empty (_cacheDir conf) (_auth conf)
     method GET $ route
-        [ ("cookbooks/:name", json overview)
-        , ("cookbooks/:name/versions/:version", json revision)
+        [ ("cookbooks/:name", overview conf)
+        , ("cookbooks/:name/versions/:version", revision conf)
         , ("cookbooks/:name/versions/:version/archive", archive conf cache)
         ]
   where
-    json h = h conf >>= writeLBS . encode
-    conf   = fromJust $ getOther app
+    conf = fromJust $ getOther app
 
 --
 -- Handlers
 --
 
-overview :: AppConfig -> Snap Cookbook
+overview :: AppConfig -> Snap ()
 overview conf = do
     name <- requireParam "name"
     rep  <- applyAuth (getRepository name) conf
     ver  <- applyAuth (getVersions name) conf
-    return $ toOverview (fromJust rep) ver conf
+    json (toOverview (fromJust rep) ver) conf
 
-revision :: AppConfig -> Snap Cookbook
+revision :: AppConfig -> Snap ()
 revision conf = do
     name <- requireParam "name"
     ver  <- requireParam "version"
     rep  <- applyAuth (getRepository name) conf
-    return $ toRevision (fromJust rep) ver conf
+    json (toRevision (fromJust rep) ver) conf
 
 archive :: AppConfig -> AC.ArchiveCache -> Snap ()
 archive conf cache = do
@@ -70,6 +69,9 @@ archive conf cache = do
 --
 -- Helpers
 --
+
+json :: Snap Cookbook -> AppConfig -> Snap ()
+json h conf = h conf >>= writeLBS . encode
 
 toOverview :: Repository -> [Version] -> AppConfig -> Cookbook
 toOverview Repository{..} vers conf = Overview
