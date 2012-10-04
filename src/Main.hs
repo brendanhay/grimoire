@@ -15,7 +15,7 @@ module Main (
       main
     ) where
 
-import Snap.Http.Server  (httpServe, getOther)
+import Snap.Http.Server  (httpServe)
 import System.IO
 import Grimoire.Handlers (site)
 import Grimoire.Config   (parseConfig)

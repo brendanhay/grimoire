@@ -22,82 +22,87 @@ import Data.Maybe             (fromJust)
 import Data.String            (IsString(..))
 import Snap.Core
 import Snap.Http.Server
+import Snap.Util.FileServe    (serveFile)
 import Grimoire.GitHub
 import Grimoire.Types
-import Grimoire.FileCache
 
 import qualified Data.ByteString.Char8 as BS
+import qualified Grimoire.ArchiveCache as AC
 
-type Config' = Config Snap AppConfig
-
-site :: Config' -> Snap ()
-site conf = method GET $ route
-    [ ("cookbooks/:name", json overview)
-    , ("cookbooks/:name/versions/:version", json revision)
-    , ("cookbooks/:name/versions/:version/archive", file archive)
-    ]
+site :: Config m AppConfig -> Snap ()
+site app = do
+    cache <- liftIO $ AC.empty (_cacheDir conf) (_auth conf)
+    method GET $ route
+        [ ("cookbooks/:name", json overview)
+        , ("cookbooks/:name/versions/:version", json revision)
+        , ("cookbooks/:name/versions/:version/archive", archive conf cache)
+        ]
   where
-    file h = h conf
     json h = h conf >>= writeLBS . encode
+    conf   = fromJust $ getOther app
 
 --
--- Private
+-- Handlers
 --
 
-overview :: Config' -> Snap Cookbook
+overview :: AppConfig -> Snap Cookbook
 overview conf = do
     name <- requireParam "name"
-    rep  <- gitHub (repo name) conf
-    ver  <- gitHub (vers name) conf
-    return $ result (fromJust rep) ver
-  where
-    result Repository{..} v = Overview
-        { name          = repoName
-        , description   = repoDescription
-        , latestVersion = latest conf repoName v
-        , versions      = map (RevisionUri $ uri conf repoName) v
-        , maintainer    = repoOwner
-        , createdAt     = repoCreated
-        , updatedAt     = repoUpdated
-        }
+    rep  <- applyAuth (getRepository name) conf
+    ver  <- applyAuth (getVersions name) conf
+    return $ toOverview (fromJust rep) ver conf
 
-revision :: Config' -> Snap Cookbook
+revision :: AppConfig -> Snap Cookbook
 revision conf = do
     name <- requireParam "name"
     ver  <- requireParam "version"
-    rep  <- gitHub (repo name) conf
-    return $ result (fromJust rep) ver
-  where
-    result Repository{..} v = Revision
-        { cookbook  = uri conf repoName
-        , file      = ArchiveUri (uri conf repoName) v
-        , version   = v
-        , createdAt = repoCreated
-        , updatedAt = repoUpdated
-        }
+    rep  <- applyAuth (getRepository name) conf
+    return $ toRevision (fromJust rep) ver conf
 
-archive :: Config' -> Snap ()
-archive conf = do
+archive :: AppConfig -> AC.ArchiveCache -> Snap ()
+archive conf cache = do
     name <- requireParam "name"
     ver  <- requireParam "version"
-    serveArchive (ArchiveUri (uri conf name) ver) $ appConfig conf
+    file <- liftIO $ AC.lookup (ArchiveUri (baseUri conf name) ver) cache
+    serveFile file
 
-appConfig :: Config' -> AppConfig
-appConfig = fromJust . getOther
+--
+-- Helpers
+--
 
-gitHub :: (Auth -> IO a) -> Config' -> Snap a
-gitHub f conf = liftIO $ f (_auth $ appConfig conf)
+toOverview :: Repository -> [Version] -> AppConfig -> Cookbook
+toOverview Repository{..} vers conf = Overview
+    { name          = repoName
+    , description   = repoDescription
+    , latestVersion = latest conf repoName vers
+    , versions      = map (RevisionUri $ baseUri conf repoName) vers
+    , maintainer    = repoOwner
+    , createdAt     = repoCreated
+    , updatedAt     = repoUpdated
+    }
 
-latest :: Config' -> Name -> [Version] -> Maybe RevisionUri
-latest _ _ []       = Nothing
-latest conf n (v:_) = Just $ RevisionUri (uri conf n) v
+toRevision :: Repository -> Version -> AppConfig -> Cookbook
+toRevision Repository{..} ver conf = Revision
+    { cookbook  = baseUri conf repoName
+    , file      = ArchiveUri (baseUri conf repoName) ver
+    , version   = ver
+    , createdAt = repoCreated
+    , updatedAt = repoUpdated
+    }
 
-uri :: Config' -> Name -> Uri
-uri conf = Uri host port
-  where
-    f g  = fromJust $ g conf
-    host = f getHostname
-    port = f getPort
+applyAuth :: (Auth -> IO a) -> AppConfig -> Snap a
+applyAuth f = liftIO . f . _auth
+
+latest :: AppConfig -> Name -> [Version] -> Maybe RevisionUri
+latest _ _ []            = Nothing
+latest conf name (ver:_) = Just $ RevisionUri (baseUri conf name) ver
+
+baseUri :: AppConfig -> Name -> Uri
+baseUri AppConfig{..} = Uri _host _port
+
+--
+-- Params
+--
 
 class RequiredParam a where
     requireParam :: BS.ByteString -> Snap a

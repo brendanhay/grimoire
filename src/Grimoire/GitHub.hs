@@ -17,12 +17,12 @@ module Grimoire.GitHub (
     , Tag(..)
 
     -- * Functions
-    , repo
-    , vers
-    , tags
-    , tarball
+    , getRepository
+    , getVersions
+    , getTarball
     ) where
 
+import Control.Monad.IO.Class      (liftIO)
 import Data.String
 import Control.Applicative         ((<$>), (<*>), empty)
 import Data.Aeson                  (decode')
@@ -70,54 +70,53 @@ instance FromJSON Tag where
 -- API
 --
 
-repo :: Name -> Auth -> IO (Maybe Repository)
-repo n a = do
-    body <- request (BS.intercalate "/" ["repos", orgStr a, n]) a
+getRepository :: Name -> Auth -> IO (Maybe Repository)
+getRepository name a = do
+    body <- request (BS.intercalate "/" ["repos", orgStr a, name]) a
     return (decode' body :: Maybe Repository)
 
-vers :: Name -> Auth -> IO [Version]
-vers n a = do
-    tags' <- tags n a
+getVersions :: Name -> Auth -> IO [Version]
+getVersions name a = do
+    tags' <- getTags name a
     return . map (fromString . BS.unpack . tagName) $ sort tags'
 
-tags :: Name -> Auth -> IO [Tag]
-tags n a = do
-    body <- request (BS.intercalate "/" ["repos", orgStr a, n, "tags"]) a
-    return $ case decode' body :: Maybe (Vector Tag) of
-        Just v  -> toList v
-        Nothing -> []
-
-tarball :: Name
+getTarball :: Name
         -> Version
         -> Auth
         -> C.Sink BS.ByteString (C.ResourceT IO) ()
         -> IO ()
-tarball n v a sink = (withManager $ \m -> do
-    res <- http (uri u a) m
-    responseBody res C.$$+- sink)
+getTarball name ver a sink = withManager $ \m -> do
+    liftIO . print $ BS.concat ["Tarball: ", uri]
+    res <- http (wrapAuth uri a) m
+    responseBody res C.$$+- sink
   where
-    u = BS.intercalate "/" [ "https://github.com"
-                           , orgStr a
-                           , n
-                           , "tarball"
-                           , versionStr v
-                           ]
+    uri = BS.intercalate "/" [ "https://github.com"
+                             , orgStr a
+                             , name
+                             , "tarball"
+                             , versionStr ver
+                             ]
 
 --
 -- Private
 --
 
+getTags :: Name -> Auth -> IO [Tag]
+getTags n a = do
+    body <- request (BS.intercalate "/" ["repos", orgStr a, n, "tags"]) a
+    return $ case decode' body :: Maybe (Vector Tag) of
+        Just v  -> toList v
+        Nothing -> []
+
 request :: BS.ByteString -> Auth -> IO BL.ByteString
 request path a = withManager $ \m -> do
-    Response _ _ _ body <- httpLbs (uri path a) m
+    Response _ _ _ body <- httpLbs (wrapAuth uri a) m
     return body
+  where
+    uri = BS.concat ["https://api.github.com/", path]
 
-uri :: BS.ByteString -> Auth -> Request m
-uri path a = case parseUrl $ BS.unpack url of
+wrapAuth :: BS.ByteString -> Auth -> Request m
+wrapAuth path a = case parseUrl $ BS.unpack path of
     Just r  -> applyBasicAuth (userStr a) (passStr a) r
     Nothing -> error "Invalid request"
-  where
-    url = BS.concat [base, path]
 
-base :: BS.ByteString
-base = "https://api.github.com/"

@@ -16,8 +16,9 @@ module Grimoire.Config (
     ) where
 
 import Control.Lens          ((.~))
+import Control.Monad         (liftM)
 import Data.Monoid
-import Data.Maybe            (fromMaybe)
+import Data.Maybe            (fromJust, fromMaybe)
 import Data.String
 import Snap.Core             (MonadSnap)
 import Snap.Http.Server
@@ -27,10 +28,10 @@ import Grimoire.Types
 import qualified Data.ByteString.Char8 as BS
 
 parseConfig :: MonadSnap m => IO (Config m AppConfig)
-parseConfig = extendedCommandLineConfig
-    (flags (fromMaybe mempty $ getOther def) ++ optDescrs def) mappend def
+parseConfig = liftM extend (extendedCommandLineConfig flags' mappend empty)
   where
-    def = emptyConfig
+    empty  = emptyConfig
+    flags' = flags (fromMaybe mempty $ getOther empty) ++ optDescrs empty
 
 --
 -- Private
@@ -45,8 +46,16 @@ flags conf@AppConfig{..} = map (fmapOpt $ fmap (`setOther` mempty))
     , Option [] ["github-pass"] (ReqArg (upd authPass) "PASS")
           $ "github password" ++ text _authPass
     , Option [] ["cache-dir"] (ReqArg (\s -> Just $ conf { _cacheDir = BS.pack s }) "DIR")
-          $ "github password" ++ text _authPass
+          $ "cache directory, default " ++ show _cacheDir
     ]
   where
     upd l s = Just $ (auth . l .~ fromString s) conf
     text f  = (", default " ++) . show $ f _auth
+
+extend :: Config m AppConfig -> Config m AppConfig
+extend conf = setOther app conf
+  where
+    get f = fromJust $ f conf
+    app   = (fromJust $ getOther conf) { _host = get getHostname
+                                       , _port = get getPort
+                                       }
