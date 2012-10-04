@@ -1,6 +1,22 @@
 Grimoire
 =======
 
+Table of Contents
+-----------------
+
+* [Introduction](#introduction)
+* [Contribute](#contribute)
+* [Licence](#licence)
+
+
+<a name="introduction" />
+
+Introduction
+------------
+
+> TODO
+
+
 <a name="contribute" />
 
 Contribute
