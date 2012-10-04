@@ -49,14 +49,14 @@ overview conf = do
     name <- requireParam "name"
     rep  <- applyAuth (getRepository name) conf
     ver  <- applyAuth (getVersions name) conf
-    json (toOverview (fromJust rep) ver) conf
+    json $ toOverview (fromJust rep) ver conf
 
 revision :: AppConfig -> Snap ()
 revision conf = do
     name <- requireParam "name"
     ver  <- requireParam "version"
     rep  <- applyAuth (getRepository name) conf
-    json (toRevision (fromJust rep) ver) conf
+    json $ toRevision (fromJust rep) ver conf
 
 archive :: AppConfig -> AC.ArchiveCache -> Snap ()
 archive conf cache = do
@@ -69,9 +69,6 @@ archive conf cache = do
 --
 -- Helpers
 --
-
-json :: Snap Cookbook -> AppConfig -> Snap ()
-json h conf = h conf >>= writeLBS . encode
 
 toOverview :: Repository -> [Version] -> AppConfig -> Cookbook
 toOverview Repository{..} vers conf = Overview
@@ -102,6 +99,9 @@ latest conf name (ver:_) = Just $ RevisionUri (baseUri conf name) ver
 
 baseUri :: AppConfig -> Name -> Uri
 baseUri AppConfig{..} = Uri _host _port
+
+json :: Cookbook -> Snap ()
+json = writeLBS . encode
 
 setDisposition :: FilePath -> Snap ()
 setDisposition file = modifyResponse $ setHeader "Content-Disposition" val
