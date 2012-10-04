@@ -17,3 +17,4 @@ conf:
 
 clean:
 	$(CABAL) clean
+	rm -rf .cache tmp cookbooks
