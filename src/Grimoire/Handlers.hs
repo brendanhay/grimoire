@@ -64,6 +64,7 @@ archive conf cache = do
     name <- requireParam "name"
     ver  <- requireParam "version"
     file <- liftIO $ AC.lookup (ArchiveUri (baseUri conf name) ver) cache
+    setDisposition file
     serveFile file
 
 --
@@ -99,6 +100,12 @@ latest conf name (ver:_) = Just $ RevisionUri (baseUri conf name) ver
 
 baseUri :: AppConfig -> Name -> Uri
 baseUri AppConfig{..} = Uri _host _port
+
+setDisposition :: FilePath -> Snap ()
+setDisposition file = modifyResponse $ setHeader "Content-Disposition" val
+  where
+    name = snd . BS.spanEnd (not . (== '/')) $ BS.pack file
+    val  = BS.concat ["attachment; filename=\"", name, "\""]
 
 --
 -- Params
