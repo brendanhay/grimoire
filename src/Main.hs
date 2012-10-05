@@ -36,4 +36,4 @@ main = do
     repos <- R.new _auth
     arcs  <- A.new _auth _cacheDir
 
-    httpServe app $ (site conf repos arcs)
+    httpServe app $ site conf repos arcs
