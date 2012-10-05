@@ -1,3 +1,5 @@
+{-# LANGUAGE FlexibleContexts #-}
+
 -- |
 -- Module      : Grimoire.Handlers
 -- Copyright   : (c) 2012 Brendan Hay <brendan@soundcloud.com>
@@ -15,6 +17,7 @@ module Grimoire.Handlers (
       site
     ) where
 
+import Prelude         hiding (lookup)
 import Control.Monad.IO.Class (liftIO)
 import Control.Monad          (liftM)
 import Data.Aeson             (encode)
@@ -25,20 +28,19 @@ import Snap.Http.Server
 import Snap.Util.FileServe    (serveFile)
 import Grimoire.GitHub
 import Grimoire.Types
+import Grimoire.Cache
 
-import qualified Data.ByteString.Char8 as BS
-import qualified Grimoire.ArchiveCache as AC
+import qualified Data.ByteString.Char8     as BS
+import qualified Grimoire.Cache.Repository as R
+import qualified Grimoire.Cache.Archive    as A
 
-site :: Config m AppConfig -> Snap ()
-site app = do
-    cache <- liftIO $ AC.empty (_cacheDir conf) (_auth conf)
+site :: AppConfig -> R.Cache -> A.Cache -> Snap ()
+site conf repos archives = do
     method GET $ route
         [ ("cookbooks/:name", overview conf)
-        , ("cookbooks/:name/versions/:version", revision conf)
-        , ("cookbooks/:name/versions/:version/archive", archive conf cache)
+        , ("cookbooks/:name/versions/:version", revision conf repos)
+        , ("cookbooks/:name/versions/:version/archive", archive conf archives)
         ]
-  where
-    conf = fromJust $ getOther app
 
 --
 -- Handlers
@@ -51,18 +53,18 @@ overview conf = do
     ver  <- applyAuth (getVersions name) conf
     json $ toOverview (fromJust rep) ver conf
 
-revision :: AppConfig -> Snap ()
-revision conf = do
+revision :: AppConfig -> R.Cache -> Snap ()
+revision conf cache = do
     name <- requireParam "name"
     ver  <- requireParam "version"
-    rep  <- applyAuth (getRepository name) conf
-    json $ toRevision (fromJust rep) ver conf
+    repo <- liftIO $ lookup name cache
+    json $ toRevision conf ver repo
 
-archive :: AppConfig -> AC.ArchiveCache -> Snap ()
+archive :: AppConfig -> A.Cache -> Snap ()
 archive conf cache = do
     name <- requireParam "name"
     ver  <- requireParam "version"
-    file <- liftIO $ AC.lookup (ArchiveUri (baseUri conf name) ver) cache
+    file <- liftIO $ lookup (ArchiveUri (baseUri conf name) ver) cache
     setDisposition file
     serveFile file
 
@@ -81,8 +83,8 @@ toOverview Repository{..} vers conf = Overview
     , updatedAt     = repoUpdated
     }
 
-toRevision :: Repository -> Version -> AppConfig -> Cookbook
-toRevision Repository{..} ver conf = Revision
+toRevision :: AppConfig -> Version -> Repository -> Cookbook
+toRevision conf ver Repository{..} = Revision
     { cookbook  = baseUri conf repoName
     , file      = ArchiveUri (baseUri conf repoName) ver
     , version   = ver

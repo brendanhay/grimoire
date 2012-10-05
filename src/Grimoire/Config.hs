@@ -1,3 +1,5 @@
+{-# LANGUAGE TemplateHaskell #-}
+
 -- |
 -- Module      : Grimoire.Config
 -- Copyright   : (c) 2012 Brendan Hay <brendan@soundcloud.com>
@@ -11,8 +13,11 @@
 --
 
 module Grimoire.Config (
+    -- * Exported Types
+      AppConfig(..)
+
     -- * Functions
-      parseConfig
+    , parseConfig
     ) where
 
 import Control.Lens          ((.~))
@@ -25,10 +30,10 @@ import Snap.Http.Server
 import System.Console.GetOpt
 import Grimoire.Types
 
-import qualified Data.ByteString.Char8 as BS
+import qualified Data.ByteString.Char8    as BS
 
 parseConfig :: MonadSnap m => IO (Config m AppConfig)
-parseConfig = liftM extend (extendedCommandLineConfig flags' mappend empty)
+parseConfig = liftM initConfig (extendedCommandLineConfig flags' mappend empty)
   where
     empty  = emptyConfig
     flags' = flags (fromMaybe mempty $ getOther empty) ++ optDescrs empty
@@ -36,6 +41,15 @@ parseConfig = liftM extend (extendedCommandLineConfig flags' mappend empty)
 --
 -- Private
 --
+
+initConfig :: Config m AppConfig -> Config m AppConfig
+initConfig conf = setOther app conf
+  where
+    f g = fromJust $ g conf
+    app = (f getOther)
+        { _host = f getHostname
+        , _port = f getPort
+        }
 
 flags :: AppConfig -> [OptDescr (Maybe (Config m AppConfig))]
 flags conf@AppConfig{..} = map (fmapOpt $ fmap (`setOther` mempty))
@@ -51,11 +65,3 @@ flags conf@AppConfig{..} = map (fmapOpt $ fmap (`setOther` mempty))
   where
     upd l s = Just $ (auth . l .~ fromString s) conf
     text f  = (", default " ++) . show $ f _auth
-
-extend :: Config m AppConfig -> Config m AppConfig
-extend conf = setOther app conf
-  where
-    get f = fromJust $ f conf
-    app   = (fromJust $ getOther conf) { _host = get getHostname
-                                       , _port = get getPort
-                                       }

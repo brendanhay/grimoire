@@ -15,16 +15,25 @@ module Main (
       main
     ) where
 
-import Snap.Http.Server  (httpServe)
+import Data.Maybe        (fromJust)
+import Snap.Http.Server
 import System.IO
 import Grimoire.Handlers (site)
 import Grimoire.Config   (parseConfig)
+import Grimoire.Types
+
+import qualified Grimoire.Cache.Archive    as A
+import qualified Grimoire.Cache.Repository as R
 
 main :: IO ()
 main = do
-  -- Just for development to ensure foreman flushes stdout
-  hSetBuffering stdout NoBuffering
-  conf <- parseConfig
-  print conf
-  httpServe conf $ site conf
+    hSetBuffering stdout NoBuffering -- Ensure foreman flushes stdout
+    app <- parseConfig
+    print app
 
+    let conf@AppConfig{..} = fromJust $ getOther app
+
+    repos <- R.new _auth
+    arcs  <- A.new _auth _cacheDir
+
+    httpServe app $ (site conf repos arcs)
