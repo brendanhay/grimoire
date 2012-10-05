@@ -40,11 +40,8 @@ data Cache_ k v = Cache
 instance C.Cache Cache_ ArchiveUri FilePath where
     lookup uri@ArchiveUri{..} Cache{..} = do
          p <- doesFileExist file
-         if p then do
-             createDirectoryIfMissing True dir
-             return file
-         else
-             C.lookup uri _backing
+         if p then return file
+         else createDirectoryIfMissing True dir >> C.lookup uri _backing
       where
         name = _uriCookbook _archiveUri
         (dir, file) = paths name _archiveVersion _dir
@@ -72,3 +69,4 @@ paths name ver dir = (BS.unpack pref, BS.unpack file)
     join = BS.intercalate "/"
     pref = join [dir, name]
     file = join [pref, BS.concat [name, "-", encodeUri ver, ".tar.gz"]]
+
