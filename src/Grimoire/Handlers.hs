@@ -34,12 +34,11 @@ import qualified Grimoire.Cache.Repository as R
 import qualified Grimoire.Cache.Archive    as A
 
 site :: AppConfig -> R.Cache -> A.Cache -> Snap ()
-site conf repos archives = do
-    method GET $ route
-        [ ("cookbooks/:name", overview conf)
-        , ("cookbooks/:name/versions/:version", revision conf repos)
-        , ("cookbooks/:name/versions/:version/archive", archive conf archives)
-        ]
+site conf repos archives = method GET $ route
+    [ ("cookbooks/:name", overview conf)
+    , ("cookbooks/:name/versions/:version", revision conf repos)
+    , ("cookbooks/:name/versions/:version/archive", archive conf archives)
+    ]
 
 --
 -- Handlers
