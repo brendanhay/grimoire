@@ -1,5 +1,3 @@
-{-# LANGUAGE TemplateHaskell #-}
-
 -- |
 -- Module      : Grimoire.Config
 -- Copyright   : (c) 2012 Brendan Hay <brendan@soundcloud.com>
