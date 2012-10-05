@@ -39,4 +39,4 @@ instance C.Cache Cache_ Name Repository where
 new :: Auth -> IO Cache
 new auth = liftM Cache (C.shared ctor)
   where
-    ctor name = getRepository name auth >>= return . fromJust
+    ctor name = liftM fromJust (getRepository name auth)
