@@ -24,7 +24,6 @@ import Data.Aeson             (encode)
 import Data.Maybe             (fromJust)
 import Data.String            (IsString(..))
 import Snap.Core
-import Snap.Http.Server
 import Snap.Util.FileServe    (serveFile)
 import Grimoire.GitHub
 import Grimoire.Types
