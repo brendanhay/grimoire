@@ -60,11 +60,11 @@ withKey key store fn = do
     mcons (Just v) = return v
 
 withStore :: (Ord k) => k -> LockStore k v -> IO (Lock v)
-withStore key store = modifyMVar store f
+withStore key = flip modifyMVar f
   where
-    f store' = case M.lookup key store' of
+    f store = case M.lookup key store of
         Just lock ->
-            return (store', lock)
+            return (store, lock)
         Nothing -> do
             lock <- newMVar Nothing
-            return (M.insert key lock store', lock)
+            return (M.insert key lock store, lock)

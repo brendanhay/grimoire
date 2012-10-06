@@ -27,13 +27,19 @@ import qualified Grimoire.Cache.Repository as R
 
 main :: IO ()
 main = do
-    hSetBuffering stdout NoBuffering -- Ensure foreman flushes stdout
+    -- Ensure foreman flushes stdout
+    hSetBuffering stdout NoBuffering
+
+    -- Get some command line args
     app <- parseConfig
     print app
 
+    -- Extract the important shit
     let conf@AppConfig{..} = fromJust $ getOther app
 
+    -- Setup type caches
     repos <- R.new _auth
     arcs  <- A.new _auth _cacheDir
 
+    -- Start the serve with the site handlers
     httpServe app $ site conf repos arcs
