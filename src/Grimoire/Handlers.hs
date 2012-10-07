@@ -24,9 +24,9 @@ import Data.Aeson             (ToJSON, encode)
 import Data.String            (IsString(..))
 import Snap.Core
 import Snap.Util.FileServe    (serveFile)
+import Grimoire.Cache
 import Grimoire.GitHub
 import Grimoire.Types
-import Grimoire.Cache
 
 import qualified Data.ByteString.Char8   as BS
 import qualified Grimoire.Cache.Revision as R
