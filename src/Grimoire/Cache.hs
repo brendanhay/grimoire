@@ -14,7 +14,6 @@ module Grimoire.Cache (
     -- * Type Class
       Cache
     , lookup
-    , force
 
     -- * Restricted Constructors
     , AtomicCache
