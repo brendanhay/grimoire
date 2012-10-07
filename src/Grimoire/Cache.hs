@@ -17,8 +17,8 @@ module Grimoire.Cache (
     , force
 
     -- * Restricted Constructors
-    , SharedCache
-    , shared
+    , AtomicCache
+    , atomically
     ) where
 
 import Prelude hiding (lookup)
@@ -33,19 +33,19 @@ class Ord k => Cache c k v where
 type Lock v        = MVar (Maybe v)
 type LockStore k v = MVar (M.Map k (Lock v))
 
-data SharedCache k v = SharedCache
+data AtomicCache k v = AtomicCache
     { _store :: LockStore k v
     , _ctor  :: k -> IO v
     }
 
-instance Ord k => Cache SharedCache k v where
-    lookup key SharedCache{..} = withKey key _store _ctor
+instance Ord k => Cache AtomicCache k v where
+    lookup key AtomicCache{..} = withKey key _store _ctor
     force = lookup
 
-shared :: (k -> IO v) -> IO (SharedCache k v)
-shared ctor = do
+atomically :: (k -> IO v) -> IO (AtomicCache k v)
+atomically ctor = do
     store <- newMVar M.empty
-    return $ SharedCache store ctor
+    return $ AtomicCache store ctor
 
 --
 -- Private

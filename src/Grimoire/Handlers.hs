@@ -60,7 +60,7 @@ archive :: AppConfig -> A.Cache -> Snap ()
 archive conf cache = do
     name <- requireParam "name"
     ver  <- requireParam "version"
-    file <- liftIO $ lookup ((ArchiveUri $ (_baseUri conf) name) ver) cache
+    file <- liftIO $ lookup ((ArchiveUri $ _baseUri conf name) ver) cache
     setDisposition file
     serveFile file
 

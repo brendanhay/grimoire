@@ -33,23 +33,23 @@ import qualified Grimoire.Cache        as C
 type Cache = Cache_ ArchiveUri FilePath
 
 data Cache_ k v = Cache
-    { _dir     :: BS.ByteString
-    , _backing :: C.SharedCache k v
+    { _dir   :: BS.ByteString
+    , _cache :: C.AtomicCache k v
     }
 
 instance C.Cache Cache_ ArchiveUri FilePath where
     lookup uri@ArchiveUri{..} Cache{..} = do
          p <- doesFileExist file
          if p then return file
-         else createDirectoryIfMissing True dir >> C.lookup uri _backing
+         else createDirectoryIfMissing True dir >> C.lookup uri _cache
       where
         name = _uriCookbook _archiveUri
         (dir, file) = paths name _archiveVersion _dir
 
-    force uri = C.force uri . _backing
+    force uri = C.force uri . _cache
 
 new :: AppConfig -> IO Cache
-new conf = liftM (Cache base) (C.shared $ retrieve conf base)
+new conf = liftM (Cache base) (C.atomically $ retrieve conf base)
   where
     base = _cacheDir conf
 

@@ -29,12 +29,12 @@ type Key   = (Name, Version)
 type Cache = Cache_ Key Revision
 
 data Cache_ k v = Cache
-    { _backing :: C.SharedCache k v
+    { _cache :: C.AtomicCache k v
     }
 
 instance C.Cache Cache_ Key Revision where
-    lookup key (Cache db) = C.lookup key db
-    force  key (Cache db) = C.force key db
+    lookup key (Cache cache) = C.lookup key cache
+    force  key (Cache cache) = C.force  key cache
 
 new :: AppConfig -> IO Cache
-new conf = liftM Cache (C.shared $ \(name, ver) -> getRevision name ver conf)
+new conf = liftM Cache (C.atomically $ \(name, ver) -> getRevision name ver conf)

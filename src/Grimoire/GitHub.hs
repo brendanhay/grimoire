@@ -32,9 +32,6 @@ import qualified Data.Conduit as C
 import qualified Data.ByteString.Char8      as BS
 import qualified Data.ByteString.Lazy.Char8 as BL
 
-apiUri :: BS.ByteString
-apiUri path = BS.concat ["https://api.github.com/", path]
-
 data Repository = Repository
    { repoName        :: BS.ByteString
    , repoDescription :: BS.ByteString
@@ -101,6 +98,9 @@ getTarball name ver AppConfig{..} sink = withManager $ \m -> do
 -- Private
 --
 
+api :: BS.ByteString -> BS.ByteString
+api path = BS.concat ["https://api.github.com/", path]
+
 getRepository :: Name -> Auth -> IO Repository
 getRepository name a = do
     body <- request (BS.intercalate "/" ["repos", orgStr a, name]) a
@@ -120,7 +120,7 @@ getTags n a = do
 
 request :: BS.ByteString -> Auth -> IO BL.ByteString
 request path a = withManager $ \m -> do
-    Response _ _ _ body <- httpLbs (wrapAuth (apiUri path) a) m
+    Response _ _ _ body <- httpLbs (wrapAuth (api path) a) m
     return body
 
 wrapAuth :: BS.ByteString -> Auth -> Request m

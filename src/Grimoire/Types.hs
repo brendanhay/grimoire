@@ -139,7 +139,7 @@ instance Monoid Auth where
         , _authPass = ov _authPass
         }
       where
-        ov f = ((rappend def) `on` f) a b
+        ov f = (rappend def `on` f) a b
 
 rappend :: Eq a => a -> a -> a -> a
 rappend d x y | x == d    = y
