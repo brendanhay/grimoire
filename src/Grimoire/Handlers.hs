@@ -20,8 +20,7 @@ module Grimoire.Handlers (
 import Prelude         hiding (lookup)
 import Control.Monad.IO.Class (liftIO)
 import Control.Monad          (liftM)
-import Data.Aeson             (encode)
-import Data.Maybe             (fromJust)
+import Data.Aeson             (ToJSON, encode)
 import Data.String            (IsString(..))
 import Snap.Core
 import Snap.Util.FileServe    (serveFile)
@@ -29,15 +28,15 @@ import Grimoire.GitHub
 import Grimoire.Types
 import Grimoire.Cache
 
-import qualified Data.ByteString.Char8     as BS
-import qualified Grimoire.Cache.Repository as R
-import qualified Grimoire.Cache.Archive    as A
+import qualified Data.ByteString.Char8   as BS
+import qualified Grimoire.Cache.Revision as R
+import qualified Grimoire.Cache.Archive  as A
 
 site :: AppConfig -> R.Cache -> A.Cache -> Snap ()
-site conf repos archives = method GET $ route
+site conf revs arcs = method GET $ route
     [ ("cookbooks/:name", overview conf)
-    , ("cookbooks/:name/versions/:version", revision conf repos)
-    , ("cookbooks/:name/versions/:version/archive", archive conf archives)
+    , ("cookbooks/:name/versions/:version", revision conf revs)
+    , ("cookbooks/:name/versions/:version/archive", archive conf arcs)
     ]
 
 --
@@ -47,22 +46,21 @@ site conf repos archives = method GET $ route
 overview :: AppConfig -> Snap ()
 overview conf = do
     name <- requireParam "name"
-    rep  <- applyAuth (getRepository name) conf
-    ver  <- applyAuth (getVersions name) conf
-    json $ toOverview (fromJust rep) ver conf
+    over <- liftIO $ getOverview name conf
+    writeJson over
 
 revision :: AppConfig -> R.Cache -> Snap ()
-revision conf cache = do
+revision _ cache = do
     name <- requireParam "name"
     ver  <- requireParam "version"
-    repo <- liftIO $ lookup name cache
-    json $ toRevision conf ver repo
+    rev  <- liftIO $ lookup (name, ver) cache
+    writeJson rev
 
 archive :: AppConfig -> A.Cache -> Snap ()
 archive conf cache = do
     name <- requireParam "name"
     ver  <- requireParam "version"
-    file <- liftIO $ lookup (ArchiveUri (baseUri conf name) ver) cache
+    file <- liftIO $ lookup ((ArchiveUri $ (_baseUri conf) name) ver) cache
     setDisposition file
     serveFile file
 
@@ -70,38 +68,8 @@ archive conf cache = do
 -- Helpers
 --
 
-toOverview :: Repository -> [Version] -> AppConfig -> Cookbook
-toOverview Repository{..} vers conf = Overview
-    { name          = repoName
-    , description   = repoDescription
-    , latestVersion = latest conf repoName vers
-    , versions      = map (RevisionUri $ baseUri conf repoName) vers
-    , maintainer    = repoOwner
-    , createdAt     = repoCreated
-    , updatedAt     = repoUpdated
-    }
-
-toRevision :: AppConfig -> Version -> Repository -> Cookbook
-toRevision conf ver Repository{..} = Revision
-    { cookbook  = baseUri conf repoName
-    , file      = ArchiveUri (baseUri conf repoName) ver
-    , version   = ver
-    , createdAt = repoCreated
-    , updatedAt = repoUpdated
-    }
-
-applyAuth :: (Auth -> IO a) -> AppConfig -> Snap a
-applyAuth f = liftIO . f . _auth
-
-latest :: AppConfig -> Name -> [Version] -> Maybe RevisionUri
-latest _ _ []            = Nothing
-latest conf name (ver:_) = Just $ RevisionUri (baseUri conf name) ver
-
-baseUri :: AppConfig -> Name -> Uri
-baseUri AppConfig{..} = Uri _host _port
-
-json :: Cookbook -> Snap ()
-json = writeLBS . encode
+writeJson :: ToJSON j => j -> Snap ()
+writeJson = writeLBS . encode
 
 setDisposition :: FilePath -> Snap ()
 setDisposition file = modifyResponse $ setHeader "Content-Disposition" val

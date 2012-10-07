@@ -11,14 +11,9 @@
 --
 
 module Grimoire.GitHub (
-    -- * Exported Types
-      Auth(..)
-    , Repository(..)
-    , Tag(..)
-
     -- * Functions
-    , getRepository
-    , getVersions
+      getOverview
+    , getRevision
     , getTarball
     ) where
 
@@ -28,6 +23,7 @@ import Control.Applicative         ((<$>), (<*>), empty)
 import Data.Aeson                  (decode')
 import Data.Aeson.Types
 import Data.List                   (sort)
+import Data.Maybe                  (fromJust)
 import Data.Vector                 (Vector, toList)
 import Network.HTTP.Conduit hiding (queryString, path)
 import Grimoire.Types
@@ -70,28 +66,29 @@ instance FromJSON Tag where
 -- API
 --
 
-getRepository :: Name -> Auth -> IO (Maybe Repository)
-getRepository name a = do
-    body <- request (BS.intercalate "/" ["repos", orgStr a, name]) a
-    return (decode' body :: Maybe Repository)
+getOverview :: Name -> AppConfig -> IO Overview
+getOverview name AppConfig{..} = do
+    repo <- getRepository name _auth
+    vers <- getVersions name _auth
+    return $ toOverview repo vers _baseUri
 
-getVersions :: Name -> Auth -> IO [Version]
-getVersions name a = do
-    tags' <- getTags name a
-    return . map (fromString . BS.unpack . tagName) $ sort tags'
+getRevision :: Name -> Version -> AppConfig -> IO Revision
+getRevision name ver AppConfig{..} = do
+    repo <- getRepository name _auth
+    return $ toRevision repo ver _baseUri
 
 getTarball :: Name
-        -> Version
-        -> Auth
-        -> C.Sink BS.ByteString (C.ResourceT IO) ()
-        -> IO ()
-getTarball name ver a sink = withManager $ \m -> do
+           -> Version
+           -> AppConfig
+           -> C.Sink BS.ByteString (C.ResourceT IO) ()
+           -> IO ()
+getTarball name ver AppConfig{..} sink = withManager $ \m -> do
     liftIO . print $ BS.concat ["Tarball: ", uri]
-    res <- http (wrapAuth uri a) m
+    res <- http (wrapAuth uri _auth) m
     responseBody res C.$$+- sink
   where
     uri = BS.intercalate "/" [ "https://github.com"
-                             , orgStr a
+                             , orgStr _auth
                              , name
                              , "tarball"
                              , versionStr ver
@@ -100,6 +97,16 @@ getTarball name ver a sink = withManager $ \m -> do
 --
 -- Private
 --
+
+getRepository :: Name -> Auth -> IO Repository
+getRepository name a = do
+    body <- request (BS.intercalate "/" ["repos", orgStr a, name]) a
+    return $ fromJust (decode' body :: Maybe Repository)
+
+getVersions :: Name -> Auth -> IO [Version]
+getVersions name a = do
+    tags' <- getTags name a
+    return . map (fromString . BS.unpack . tagName) $ sort tags'
 
 getTags :: Name -> Auth -> IO [Tag]
 getTags n a = do
@@ -120,3 +127,25 @@ wrapAuth path a = case parseUrl $ BS.unpack path of
     Just r  -> applyBasicAuth (userStr a) (passStr a) r
     Nothing -> error "Invalid request"
 
+toOverview :: Repository -> [Version] -> BaseUri -> Overview
+toOverview Repository{..} vers base = Overview
+    { ovName        = repoName
+    , ovDescription = repoDescription
+    , ovLatest      = latest vers
+    , ovVersions    = map (RevisionUri $ base repoName) vers
+    , ovMaintainer  = repoOwner
+    , ovCreated     = repoCreated
+    , ovUpdated     = repoUpdated
+    }
+  where
+    latest (v:_) = Just $ RevisionUri (base repoName) v
+    latest []    = Nothing
+
+toRevision :: Repository -> Version -> BaseUri -> Revision
+toRevision Repository{..} ver base = Revision
+    { revCookbook = OverviewUri $ base repoName
+    , revFile     = ArchiveUri (base repoName) ver
+    , revVersion  = ver
+    , revCreated  = repoCreated
+    , revUpdated  = repoUpdated
+    }

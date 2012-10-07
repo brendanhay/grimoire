@@ -48,16 +48,18 @@ instance C.Cache Cache_ ArchiveUri FilePath where
 
     force uri = C.force uri . _backing
 
-new :: Auth -> BS.ByteString -> IO Cache
-new auth base = liftM (Cache base) (C.shared $ retrieve auth base)
+new :: AppConfig -> IO Cache
+new conf = liftM (Cache base) (C.shared $ retrieve conf base)
+  where
+    base = _cacheDir conf
 
 --
 -- Private
 --
 
-retrieve :: Auth -> BS.ByteString -> ArchiveUri -> IO FilePath
-retrieve auth base ArchiveUri{..} = do
-    getTarball name _archiveVersion auth $ sinkFile file
+retrieve :: AppConfig -> BS.ByteString -> ArchiveUri -> IO FilePath
+retrieve conf base ArchiveUri{..} = do
+    getTarball name _archiveVersion conf $ sinkFile file
     return file
   where
     name      = _uriCookbook _archiveUri

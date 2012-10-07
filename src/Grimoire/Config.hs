@@ -45,8 +45,7 @@ initConfig conf = setOther app conf
   where
     f g = fromJust $ g conf
     app = (f getOther)
-        { _host = f getHostname
-        , _port = f getPort
+        { _baseUri = Uri (f getHostname) (f getPort)
         }
 
 flags :: AppConfig -> [OptDescr (Maybe (Config m AppConfig))]

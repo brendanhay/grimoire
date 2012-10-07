@@ -20,10 +20,9 @@ import Snap.Http.Server
 import System.IO
 import Grimoire.Handlers (site)
 import Grimoire.Config   (parseConfig)
-import Grimoire.Types
 
-import qualified Grimoire.Cache.Archive    as A
-import qualified Grimoire.Cache.Repository as R
+import qualified Grimoire.Cache.Archive  as A
+import qualified Grimoire.Cache.Revision as R
 
 main :: IO ()
 main = do
@@ -31,15 +30,15 @@ main = do
     hSetBuffering stdout NoBuffering
 
     -- Get some command line args
-    app <- parseConfig
-    print app
+    httpConf <- parseConfig
+    print httpConf
 
     -- Extract the important shit
-    let conf@AppConfig{..} = fromJust $ getOther app
+    let appConf = fromJust $ getOther httpConf
 
     -- Setup type caches
-    repos <- R.new _auth
-    arcs  <- A.new _auth _cacheDir
+    revs <- R.new appConf
+    arcs <- A.new appConf
 
     -- Start the serve with the site handlers
-    httpServe app $ site conf repos arcs
+    httpServe httpConf $ site appConf revs arcs

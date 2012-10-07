@@ -1,5 +1,5 @@
 -- |
--- Module      : Grimoire.Cache.Repository
+-- Module      : Grimoire.Cache.Revision
 -- Copyright   : (c) 2012 Brendan Hay <brendan@soundcloud.com>
 -- License     : This Source Code Form is subject to the terms of
 --               the Mozilla Public License, v. 2.0.
@@ -10,7 +10,7 @@
 -- Portability : non-portable (GHC extensions)
 --
 
-module Grimoire.Cache.Repository (
+module Grimoire.Cache.Revision (
     -- * Exported Types
       Cache
 
@@ -20,23 +20,21 @@ module Grimoire.Cache.Repository (
 
 import Prelude         hiding (lookup)
 import Control.Monad          (liftM)
-import Data.Maybe             (fromJust)
-import Grimoire.Types         (Auth, Name)
-import Grimoire.GitHub        (Repository, getRepository)
+import Grimoire.Types
+import Grimoire.GitHub        (getRevision)
 
 import qualified Grimoire.Cache as C
 
-type Cache = Cache_ Name Repository
+type Key   = (Name, Version)
+type Cache = Cache_ Key Revision
 
 data Cache_ k v = Cache
     { _backing :: C.SharedCache k v
     }
 
-instance C.Cache Cache_ Name Repository where
-    lookup name (Cache db) = C.lookup name db
-    force  name (Cache db) = C.force name db
+instance C.Cache Cache_ Key Revision where
+    lookup key (Cache db) = C.lookup key db
+    force  key (Cache db) = C.force key db
 
-new :: Auth -> IO Cache
-new auth = liftM Cache (C.shared ctor)
-  where
-    ctor name = liftM fromJust (getRepository name auth)
+new :: AppConfig -> IO Cache
+new conf = liftM Cache (C.shared $ \(name, ver) -> getRevision name ver conf)
