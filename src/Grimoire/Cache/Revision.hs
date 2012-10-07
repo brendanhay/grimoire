@@ -34,7 +34,6 @@ data Cache_ k v = Cache
 
 instance C.Cache Cache_ Key Revision where
     lookup key (Cache cache) = C.lookup key cache
-    force  key (Cache cache) = C.force  key cache
 
 new :: AppConfig -> IO Cache
 new conf = liftM Cache (C.atomically $ \(name, ver) -> getRevision name ver conf)

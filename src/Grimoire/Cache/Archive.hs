@@ -46,8 +46,6 @@ instance C.Cache Cache_ ArchiveUri FilePath where
         name = _uriCookbook _archiveUri
         (dir, file) = paths name _archiveVersion _dir
 
-    force uri = C.force uri . _cache
-
 new :: AppConfig -> IO Cache
 new conf = liftM (Cache base) (C.atomically $ retrieve conf base)
   where

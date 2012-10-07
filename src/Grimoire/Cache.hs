@@ -28,7 +28,6 @@ import qualified Data.Map as M
 
 class Ord k => Cache c k v where
     lookup :: (Ord k) => k -> c k v -> IO v
-    force  :: (Ord k) => k -> c k v -> IO v
 
 type Lock v        = MVar (Maybe v)
 type LockStore k v = MVar (M.Map k (Lock v))
@@ -40,7 +39,6 @@ data AtomicCache k v = AtomicCache
 
 instance Ord k => Cache AtomicCache k v where
     lookup key AtomicCache{..} = withKey key _store _ctor
-    force = lookup
 
 atomically :: (k -> IO v) -> IO (AtomicCache k v)
 atomically ctor = do
