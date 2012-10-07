@@ -20,8 +20,8 @@ module Grimoire.Cache.Revision (
 
 import Prelude         hiding (lookup)
 import Control.Monad          (liftM)
-import Grimoire.Types
 import Grimoire.GitHub        (getRevision)
+import Grimoire.Types
 
 import qualified Grimoire.Cache as C
 

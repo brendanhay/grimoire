@@ -24,8 +24,8 @@ import Prelude        hiding (lookup)
 import Control.Monad         (liftM)
 import Data.Conduit.Binary   (sinkFile)
 import System.Directory      (doesFileExist, createDirectoryIfMissing)
-import Grimoire.Types hiding (auth)
 import Grimoire.GitHub       (getTarball)
+import Grimoire.Types
 
 import qualified Data.ByteString.Char8 as BS
 import qualified Grimoire.Cache        as C
