@@ -34,12 +34,11 @@ newCache :: (MonadIO m, Ord k) => m (Cache k v)
 newCache = liftIO . atomically $ liftM Cache (newTVar M.empty)
 
 withCache :: (MonadIO m, Ord k) => Cache k v -> IO v -> k -> m v
-withCache (Cache tvar) io key = do
-    lock <- findMValue tvar key
-    liftIO $ modifyMVar lock lookup
+withCache (Cache tvar) io key =
+    lookup tvar key >>= liftIO . flip modifyMVar f
   where
-    lookup l = do
-        y <- case l of
+    f v = do
+        y <- case v of
             Just x  -> return x
             Nothing -> io
         return (Just y, y)
@@ -48,15 +47,14 @@ withCache (Cache tvar) io key = do
 -- Private
 --
 
-findMValue :: (MonadIO m, Ord k) => TMap k v -> k -> m (MValue v)
-findMValue tvar key = liftIO $ do
-    (locks, lock) <- atomically (readTVar tvar) >>= lookup
-    seq locks . atomically $ writeTVar tvar locks
-    return lock
+lookup :: (MonadIO m, Ord k) => TMap k v -> k -> m (MValue v)
+lookup tvar key = liftIO $ do
+    (m, v) <- atomically (readTVar tvar) >>= f
+    seq m . atomically $ writeTVar tvar m
+    return v
   where
-    lookup ls = case M.lookup key ls of
-        Just l ->
-            return (ls, l)
+    f m = case M.lookup key m of
+        Just v  -> return (m, v)
         Nothing -> do
-            l <- newMVar Nothing
-            return (M.insert key l ls, l)
+            v <- newMVar Nothing
+            return (M.insert key v m, v)
