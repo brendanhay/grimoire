@@ -319,7 +319,7 @@ $(makeLenses ''Config)
 instance Monoid Config where
     mempty      = Config mempty ".cache" def
     mappend a b = a
-        { _auth     = mempty
+        { _auth     = (mappend `on` _auth) a b
         , _cacheDir = f ".cache" _cacheDir
         , _baseUri  = f def _baseUri
         }
