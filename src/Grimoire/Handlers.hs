@@ -17,13 +17,13 @@ module Grimoire.Handlers (
       site
     ) where
 
-import Prelude         hiding (lookup)
-import Control.Monad.IO.Class (liftIO)
-import Control.Monad          (liftM)
-import Data.Aeson             (ToJSON, encode)
-import Data.String            (IsString(..))
+import Prelude                hiding (lookup)
+import Control.Monad.IO.Class        (liftIO)
+import Control.Monad                 (liftM)
+import Data.Aeson                    (ToJSON, encode)
+import Data.String                   (IsString(..))
 import Snap.Core
-import Snap.Util.FileServe    (serveFile)
+import Snap.Util.FileServe           (serveFile)
 import Grimoire.Cache
 import Grimoire.GitHub
 import Grimoire.Types
