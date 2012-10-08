@@ -31,13 +31,13 @@ type TMap k v = TVar (M.Map k (MValue v))
 newtype Cache k v  = Cache (TMap k v)
 
 newCache :: (MonadIO m, Ord k) => m (Cache k v)
-newCache = liftIO . atomically $ liftM Cache (newTVar M.empty)
+newCache = liftIO . atomically $ Cache `liftM` (newTVar M.empty)
 
 withCache :: (MonadIO m, Ord k) => Cache k v -> IO v -> k -> m v
 withCache (Cache tvar) io key =
-    lookup tvar key >>= liftIO . flip modifyMVar f
+    lookup tvar key >>= liftIO . flip modifyMVar cons
   where
-    f v = do
+    cons v = do
         y <- case v of
             Just x  -> return x
             Nothing -> io
@@ -49,11 +49,11 @@ withCache (Cache tvar) io key =
 
 lookup :: (MonadIO m, Ord k) => TMap k v -> k -> m (MValue v)
 lookup tvar key = liftIO $ do
-    (m, v) <- atomically (readTVar tvar) >>= f
+    (m, v) <- atomically (readTVar tvar) >>= insert
     seq m . atomically $ writeTVar tvar m
     return v
   where
-    f m = case M.lookup key m of
+    insert m = case M.lookup key m of
         Just v  -> return (m, v)
         Nothing -> do
             v <- newMVar Nothing
