@@ -82,6 +82,7 @@ getRevision name ver Config{..} = do
 getTarball :: Name -> Version -> Config -> IO FilePath
 getTarball name ver Config{..} = do
     p <- doesFileExist file
+    error file
     unless p $ do
         createDirectoryIfMissing True dir
         withManager $ \m -> do
@@ -89,7 +90,7 @@ getTarball name ver Config{..} = do
             responseBody res C.$$+- sinkFile file
     return file
   where
-    (file, dir) = archivePaths name ver _cacheDir
+    (dir, file) = archivePaths name ver _cacheDir
     url         = tarball name ver _auth
 
 --
