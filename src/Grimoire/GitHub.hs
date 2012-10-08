@@ -82,7 +82,6 @@ getRevision name ver Config{..} = do
 getTarball :: Name -> Version -> Config -> IO FilePath
 getTarball name ver Config{..} = do
     p <- doesFileExist file
-    error file
     unless p $ do
         createDirectoryIfMissing True dir
         withManager $ \m -> do
