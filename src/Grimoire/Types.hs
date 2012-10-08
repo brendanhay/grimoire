@@ -301,7 +301,7 @@ instance ToJSON Revision where
 type BaseUri = Name -> Uri
 
 instance Eq BaseUri where
-    a == b = (a "") == (b "")
+    a == b = a "" == b ""
 
 instance Show BaseUri where
     show _ = "<#BaseUri>"

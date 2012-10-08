@@ -18,8 +18,8 @@ module Grimoire.Handlers (
     ) where
 
 import Prelude                hiding (lookup)
-import Control.Monad.IO.Class        (liftIO)
 import Control.Monad                 (liftM)
+import Control.Monad.IO.Class        (liftIO)
 import Data.Aeson                    (ToJSON, encode)
 import Data.String                   (IsString(..))
 import Snap.Core
@@ -35,11 +35,13 @@ type RevisionCache = Cache Key Revision
 type TarballCache  = Cache Key FilePath
 
 site :: Config -> RevisionCache -> TarballCache -> Snap ()
-site conf revs tars = method GET $ route
-    [ ("cookbooks/:name", overview conf)
-    , ("cookbooks/:name/versions/:version", revision conf revs)
-    , ("cookbooks/:name/versions/:version/archive", archive conf tars)
+site conf revs tars = method GET . route $ map f
+    [ ("cookbooks/:name", overview)
+    , ("cookbooks/:name/versions/:version", revision revs)
+    , ("cookbooks/:name/versions/:version/archive", archive tars)
     ]
+  where
+    f (r, h) = (r, h conf)
 
 --
 -- Handlers
@@ -51,15 +53,15 @@ overview conf = do
     over <- liftIO $ getOverview name conf
     writeJson over
 
-revision :: Config -> RevisionCache -> Snap ()
-revision conf cache = do
+revision :: RevisionCache -> Config -> Snap ()
+revision cache conf = do
     name <- requireParam "name"
     ver  <- requireParam "version"
     rev  <- withCache cache (getRevision name ver conf) (name, ver)
     writeJson rev
 
-archive :: Config -> TarballCache -> Snap ()
-archive conf cache = do
+archive :: TarballCache -> Config -> Snap ()
+archive cache conf = do
     name <- requireParam "name"
     ver  <- requireParam "version"
     file <- withCache cache (getTarball name ver conf) (name, ver)
@@ -84,7 +86,7 @@ setDisposition file = modifyResponse $ setHeader "Content-Disposition" val
 --
 
 class RequiredParam a where
-    requireParam :: BS.ByteString -> Snap a
+    requireParam :: (MonadSnap m ) => BS.ByteString -> m a
 
 instance RequiredParam String where
     requireParam = liftM BS.unpack . requireParam
