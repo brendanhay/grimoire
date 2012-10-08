@@ -15,13 +15,26 @@ module Main (
       main
     ) where
 
+import Prelude                hiding (lookup)
+import Control.Monad                 (liftM)
+import Control.Monad.IO.Class        (liftIO)
+import Data.Aeson                    (ToJSON, encode)
 import Data.Maybe        (fromJust)
-import Snap.Http.Server
+import Data.String                   (IsString(..))
+import Snap.Core
+import Snap.Http.Server hiding (Config)
+import Snap.Util.FileServe           (serveFile)
 import System.IO
-import Grimoire.Handlers (site)
+import Grimoire.Cache
 import Grimoire.Config   (parseConfig)
+import Grimoire.GitHub
+import Grimoire.Types
 
-import qualified Grimoire.Cache as C
+import qualified Data.ByteString.Char8   as BS
+
+type Key           = (Name, Version)
+type RevisionCache = Cache Key Revision
+type TarballCache  = Cache Key FilePath
 
 main :: IO ()
 main = do
@@ -37,8 +50,78 @@ main = do
     print appConf
 
     -- Setup type caches
-    revs <- C.empty
-    tars <- C.empty
+    revs <- newCache
+    tars <- newCache
 
     -- Start the serve with the site handlers
     httpServe httpConf $ site appConf revs tars
+
+--
+-- Handlers
+--
+
+site :: Config -> RevisionCache -> TarballCache -> Snap ()
+site conf revs tars = method GET . route $ map f
+    [ ("cookbooks/:name", overview)
+    , ("cookbooks/:name/versions/:version", revision revs)
+    , ("cookbooks/:name/versions/:version/archive", archive tars)
+    ]
+  where
+    f (r, h) = (r, h conf)
+
+overview :: Config -> Snap ()
+overview conf = do
+    name <- requireParam "name"
+    over <- liftIO $ getOverview name conf
+    writeJson over
+
+revision :: RevisionCache -> Config -> Snap ()
+revision cache conf = do
+    name <- requireParam "name"
+    ver  <- requireParam "version"
+    rev  <- withCache cache (getRevision name ver conf) (name, ver)
+    writeJson rev
+
+archive :: TarballCache -> Config -> Snap ()
+archive cache conf = do
+    name <- requireParam "name"
+    ver  <- requireParam "version"
+    file <- withCache cache (getTarball name ver conf) (name, ver)
+    setDisposition file
+    serveFile file
+
+--
+-- Helpers
+--
+
+writeJson :: ToJSON j => j -> Snap ()
+writeJson = writeLBS . encode
+
+setDisposition :: FilePath -> Snap ()
+setDisposition file = modifyResponse $ setHeader "Content-Disposition" val
+  where
+    name = snd . BS.spanEnd (not . (== '/')) $ BS.pack file
+    val  = BS.concat ["attachment; filename=\"", name, "\""]
+
+--
+-- Params
+--
+
+class RequiredParam a where
+    requireParam :: (MonadSnap m ) => BS.ByteString -> m a
+
+instance RequiredParam String where
+    requireParam = liftM BS.unpack . requireParam
+
+instance RequiredParam Version where
+    requireParam = liftM fromString . requireParam
+
+instance RequiredParam BS.ByteString where
+    requireParam name = do
+        val <- getParam name
+        case val of
+            Just param -> return param
+            _ -> do
+                modifyResponse $ setResponseStatus 400 ("Missing param " `BS.append` name)
+                writeBS "400 Missing param"
+                getResponse >>= finishWith

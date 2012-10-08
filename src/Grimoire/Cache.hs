@@ -13,7 +13,7 @@
 module Grimoire.Cache (
     -- * Restricted Constructors
       Cache
-    , empty
+    , newCache
     , withCache
     ) where
 
@@ -27,33 +27,30 @@ import qualified Data.Map as M
 type Lock v        = MVar (Maybe v)
 type LockStore k v = TVar (M.Map k (Lock v))
 
-data Cache k v = Cache
-    { _store :: LockStore k v
-    }
+newtype Cache k v  = Cache (LockStore k v)
 
 instance Show (Cache k v) where
     show _ = "<#Cache>"
 
-empty :: (MonadIO m, Eq k, Ord k) => m (Cache k v)
-empty = liftIO . atomically $ do
+newCache :: (MonadIO m, Eq k, Ord k) => m (Cache k v)
+newCache = liftIO . atomically $ do
     store <- newTVar M.empty
     return $ Cache store
 
 withCache :: (MonadIO m, Eq k, Ord k) => Cache k v -> IO v -> k -> m v
-withCache cache = withStore (_store cache)
-
---
--- Private
---
-
-withStore :: (MonadIO m, Ord k) => LockStore k v -> IO v -> k -> m v
-withStore store io key = findLock store key >>= liftIO . flip modifyMVar lookup
+withCache (Cache store) io key = do
+    lock <- findLock store key
+    liftIO $ modifyMVar lock lookup
   where
     lookup l = do
         y <- case l of
             Just x  -> return x
             Nothing -> io
         return (Just y, y)
+
+--
+-- Private
+--
 
 findLock :: (MonadIO m, Ord k) => LockStore k v -> k -> m (Lock v)
 findLock store key = liftIO $ do
