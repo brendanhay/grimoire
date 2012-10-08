@@ -56,8 +56,8 @@ withStore store io key = findLock store key >>= liftIO . flip modifyMVar lookup
 
 findLock :: (MonadIO m, Ord k) => LockStore k v -> k -> m (Lock v)
 findLock store key = liftIO $ do
-    (locks', lock) <- atomically (readTVar store) >>= find
-    seq locks' . atomically $ writeTVar store locks'
+    (locks, lock) <- atomically (readTVar store) >>= find
+    seq locks . atomically $ writeTVar store locks
     return lock
   where
     find ls = case M.lookup key ls of
