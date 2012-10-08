@@ -17,8 +17,7 @@ module Grimoire.GitHub (
     , getTarball
     ) where
 
-import Control.Monad (unless)
-import Control.Monad.IO.Class      (liftIO)
+import Control.Monad               (unless)
 import Data.String
 import Control.Applicative         ((<$>), (<*>), empty)
 import Data.Aeson                  (decode')
@@ -28,8 +27,8 @@ import Data.Maybe                  (fromJust)
 import Data.Vector                 (Vector, toList)
 import Network.HTTP.Conduit hiding (queryString, path)
 import Grimoire.Types
-import Data.Conduit.Binary          (sinkFile)
-import System.Directory             (doesFileExist, createDirectoryIfMissing)
+import Data.Conduit.Binary         (sinkFile)
+import System.Directory            (doesFileExist, createDirectoryIfMissing)
 
 import qualified Data.Conduit as C
 import qualified Data.ByteString.Char8      as BS
@@ -69,24 +68,25 @@ instance FromJSON Tag where
 -- API
 --
 
-getOverview :: Name -> AppConfig -> IO Overview
-getOverview name AppConfig{..} = do
+getOverview :: Name -> Config -> IO Overview
+getOverview name Config{..} = do
     repo <- getRepository name _auth
     vers <- getVersions name _auth
     return $ toOverview repo vers _baseUri
 
-getRevision :: Name -> Version -> AppConfig -> IO Revision
-getRevision name ver AppConfig{..} = do
+getRevision :: Name -> Version -> Config -> IO Revision
+getRevision name ver Config{..} = do
     repo <- getRepository name _auth
     return $ toRevision repo ver _baseUri
 
-getTarball :: Name -> Version -> AppConfig -> IO FilePath
-getTarball name ver AppConfig{..} = withManager $ \m -> do
-    p <- liftIO $ doesFileExist file
+getTarball :: Name -> Version -> Config -> IO FilePath
+getTarball name ver Config{..} = do
+    p <- doesFileExist file
     unless p $ do
-        liftIO $ createDirectoryIfMissing True dir
-        res <- http (wrapAuth url _auth) m
-        responseBody res C.$$+- sinkFile file
+        createDirectoryIfMissing True dir
+        withManager $ \m -> do
+            res <- http (wrapAuth url _auth) m
+            responseBody res C.$$+- sinkFile file
     return file
   where
     (file, dir) = archivePaths name ver _cacheDir

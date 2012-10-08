@@ -43,30 +43,30 @@ module Grimoire.Types (
     , RevisionUri(..)
     , ArchiveUri(..)
 
-    -- * Config
-    , BaseUri
-    , AppConfig(..)
-
-    , auth
-    , cacheDir
-    , baseUri
-
     -- * Time
     , Time(..)
 
     -- * Cookbooks
     , Overview(..)
     , Revision(..)
+
+    -- * Config
+    , BaseUri
+    , Config(..)
+
+    , auth
+    , cacheDir
+    , baseUri
     ) where
 
-import Control.Monad (liftM)
-import Data.Aeson    (ToJSON(..), FromJSON(..), object, (.=))
+import Control.Monad        (liftM)
+import Data.Aeson           (ToJSON(..), FromJSON(..), object, (.=))
 import Data.Default
-import Data.Function (on)
+import Data.Function        (on)
 import Control.Lens  hiding ((.=))
 import Data.Monoid
-import Data.String   (IsString(..))
-import Data.UnixTime (UnixTime, Format, parseUnixTimeGMT, formatUnixTimeGMT)
+import Data.String          (IsString(..))
+import Data.UnixTime        (UnixTime, Format, parseUnixTimeGMT, formatUnixTimeGMT)
 
 import qualified Data.ByteString.Char8 as BS
 import qualified Data.ByteString.Lazy.Char8 as BL
@@ -133,7 +133,7 @@ instance Default Auth where
 
 instance Monoid Auth where
     mempty      = Auth def def def
-    mappend a b = Auth
+    mappend a b = a
         { _authOrg  = f def _authOrg
         , _authUser = rappend def (_authUser a) (_authUser b)
         , _authPass = f def _authPass
@@ -235,38 +235,6 @@ instance ToJSON ArchiveUri where
     toJSON = toJSON . encodeUri
 
 --
--- Config
---
-
-type BaseUri = Name -> Uri
-
-instance Eq BaseUri where
-    a == b = (a "") == (b "")
-
-instance Show BaseUri where
-    show _ = "<#BaseUri>"
-
-data AppConfig = AppConfig
-    { _auth     :: Auth
-    , _cacheDir :: BS.ByteString
-    , _baseUri  :: BaseUri
-    } deriving (Show)
-
-$(makeLenses ''AppConfig)
-
--- | Basterdised non-associative monoid instance to satisfy
--- configuration parsing
-instance Monoid AppConfig where
-    mempty      = AppConfig mempty ".cache" def
-    mappend a b = AppConfig
-        { _auth     = mempty
-        , _cacheDir = f ".cache" _cacheDir
-        , _baseUri  = f def _baseUri
-        }
-      where
-        f d g = (rappend d `on` g) a b
-
---
 -- Time
 --
 
@@ -325,3 +293,35 @@ instance ToJSON Revision where
         , "updated_at" .= revUpdated
         , "created_at" .= revCreated
         ]
+
+--
+-- Config
+--
+
+type BaseUri = Name -> Uri
+
+instance Eq BaseUri where
+    a == b = (a "") == (b "")
+
+instance Show BaseUri where
+    show _ = "<#BaseUri>"
+
+data Config = Config
+    { _auth      :: Auth
+    , _cacheDir  :: BS.ByteString
+    , _baseUri   :: BaseUri
+    } deriving (Show)
+
+$(makeLenses ''Config)
+
+-- | Basterdised non-associative monoid instance to satisfy
+-- configuration parsing
+instance Monoid Config where
+    mempty      = Config mempty ".cache" def
+    mappend a b = a
+        { _auth     = mempty
+        , _cacheDir = f ".cache" _cacheDir
+        , _baseUri  = f def _baseUri
+        }
+      where
+        f d g = (rappend d `on` g) a b

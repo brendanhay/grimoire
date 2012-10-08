@@ -34,7 +34,7 @@ type Key           = (Name, Version)
 type RevisionCache = Cache Key Revision
 type TarballCache  = Cache Key FilePath
 
-site :: AppConfig -> RevisionCache  -> TarballCache -> Snap ()
+site :: Config -> RevisionCache -> TarballCache -> Snap ()
 site conf revs tars = method GET $ route
     [ ("cookbooks/:name", overview conf)
     , ("cookbooks/:name/versions/:version", revision conf revs)
@@ -45,20 +45,20 @@ site conf revs tars = method GET $ route
 -- Handlers
 --
 
-overview :: AppConfig -> Snap ()
+overview :: Config -> Snap ()
 overview conf = do
     name <- requireParam "name"
     over <- liftIO $ getOverview name conf
     writeJson over
 
-revision :: AppConfig -> RevisionCache -> Snap ()
+revision :: Config -> RevisionCache -> Snap ()
 revision conf cache = do
     name <- requireParam "name"
     ver  <- requireParam "version"
     rev  <- withCache cache (getRevision name ver conf) (name, ver)
     writeJson rev
 
-archive :: AppConfig -> TarballCache -> Snap ()
+archive :: Config -> TarballCache -> Snap ()
 archive conf cache = do
     name <- requireParam "name"
     ver  <- requireParam "version"

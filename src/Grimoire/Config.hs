@@ -11,26 +11,24 @@
 --
 
 module Grimoire.Config (
-    -- * Exported Types
-      AppConfig(..)
-
     -- * Functions
-    , parseConfig
+      parseConfig
     ) where
 
-import Control.Lens          ((.~))
-import Control.Monad         (liftM)
+import Control.Lens                 ((.~))
+import Control.Monad                (liftM)
 import Data.Monoid
-import Data.Maybe            (fromJust, fromMaybe)
+import Data.Maybe                   (fromJust, fromMaybe)
 import Data.String
-import Snap.Core             (MonadSnap)
-import Snap.Http.Server
+import Snap.Core                    (MonadSnap)
+import Snap.Http.Server      hiding (Config)
 import System.Console.GetOpt
 import Grimoire.Types
 
-import qualified Data.ByteString.Char8    as BS
+import qualified Data.ByteString.Char8 as BS
+import qualified Snap.Http.Server      as S
 
-parseConfig :: MonadSnap m => IO (Config m AppConfig)
+parseConfig :: MonadSnap m => IO (S.Config m Config)
 parseConfig = liftM initConfig (extendedCommandLineConfig flags' mappend empty)
   where
     empty  = emptyConfig
@@ -40,7 +38,7 @@ parseConfig = liftM initConfig (extendedCommandLineConfig flags' mappend empty)
 -- Private
 --
 
-initConfig :: Config m AppConfig -> Config m AppConfig
+initConfig :: S.Config m Config -> S.Config m Config
 initConfig conf = setOther app conf
   where
     f g = fromJust $ g conf
@@ -48,8 +46,8 @@ initConfig conf = setOther app conf
         { _baseUri = Uri (f getHostname) (f getPort)
         }
 
-flags :: AppConfig -> [OptDescr (Maybe (Config m AppConfig))]
-flags conf@AppConfig{..} = map (fmapOpt $ fmap (`setOther` mempty))
+flags :: Config -> [OptDescr (Maybe (S.Config m Config))]
+flags conf@Config{..} = map (fmapOpt $ fmap (`setOther` mempty))
     [ Option [] ["github-org"] (ReqArg (upd authOrg) "ORG")
           $ "github org" ++ text _authOrg
     , Option [] ["github-user"] (ReqArg (upd authUser) "USER")

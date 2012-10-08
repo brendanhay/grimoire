@@ -31,6 +31,9 @@ data Cache k v = Cache
     { _store :: LockStore k v
     }
 
+instance Show (Cache k v) where
+    show _ = "<#Cache>"
+
 empty :: (MonadIO m, Eq k, Ord k) => m (Cache k v)
 empty = liftIO . atomically $ do
     store <- newTVar M.empty
@@ -54,7 +57,7 @@ withStore store io key = findLock store key >>= liftIO . flip modifyMVar lookup
 
 findLock :: (MonadIO m, Ord k) => LockStore k v -> k -> m (Lock v)
 findLock store key = liftIO $ do
-    (locks, lock) <- atomically $ readTVar store) >>= lookup
+    (locks, lock) <- atomically (readTVar store) >>= lookup
     seq locks . atomically $ writeTVar store locks
     return lock
   where
