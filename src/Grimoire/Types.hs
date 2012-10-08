@@ -243,11 +243,8 @@ instance ToJSON ArchiveUri where
 
 type BaseUri = Name -> Uri
 
--- instance Default BaseUri where
---     def = \n -> def { _uriCookbook = n }
-
 instance Eq BaseUri where
-    -- == = a b = (a "") == (b "")
+    a == b = (a "") == (b "")
 
 data AppConfig = AppConfig
     { _auth     :: Auth

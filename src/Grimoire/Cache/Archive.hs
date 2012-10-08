@@ -20,11 +20,12 @@ module Grimoire.Cache.Archive (
     , new
     ) where
 
-import Prelude        hiding (lookup)
-import Control.Monad         (liftM)
-import Data.Conduit.Binary   (sinkFile)
-import System.Directory      (doesFileExist, createDirectoryIfMissing)
-import Grimoire.GitHub       (getTarball)
+import Prelude               hiding (lookup)
+import Control.Monad                (liftM)
+import Control.Monad.IO.Class       (MonadIO, liftIO)
+import Data.Conduit.Binary          (sinkFile)
+import System.Directory             (doesFileExist, createDirectoryIfMissing)
+import Grimoire.GitHub              (getTarball)
 import Grimoire.Types
 
 import qualified Data.ByteString.Char8 as BS
@@ -34,7 +35,7 @@ type Cache = Cache_ ArchiveUri FilePath
 
 data Cache_ k v = Cache
     { _dir   :: BS.ByteString
-    , _cache :: C.AtomicCache k v
+    , _cache :: C.STMCache k v
     }
 
 instance C.Cache Cache_ ArchiveUri FilePath where
@@ -46,8 +47,8 @@ instance C.Cache Cache_ ArchiveUri FilePath where
         name = _uriCookbook _archiveUri
         (dir, file) = paths name _archiveVersion _dir
 
-new :: AppConfig -> IO Cache
-new conf = liftM (Cache base) (C.atomically $ retrieve conf base)
+new :: MonadIO io => AppConfig -> io Cache
+new conf = liftM (Cache base) (C.newSTM $ retrieve conf base)
   where
     base = _cacheDir conf
 
@@ -55,9 +56,9 @@ new conf = liftM (Cache base) (C.atomically $ retrieve conf base)
 -- Private
 --
 
-retrieve :: AppConfig -> BS.ByteString -> ArchiveUri -> IO FilePath
+retrieve :: MonadIO io => AppConfig -> BS.ByteString -> ArchiveUri -> io FilePath
 retrieve conf base ArchiveUri{..} = do
-    getTarball name _archiveVersion conf $ sinkFile file
+    liftIO $ getTarball name _archiveVersion conf $ sinkFile file
     return file
   where
     name      = _uriCookbook _archiveUri

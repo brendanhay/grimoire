@@ -18,9 +18,10 @@ module Grimoire.Cache.Revision (
     , new
     ) where
 
-import Prelude         hiding (lookup)
-import Control.Monad          (liftM)
-import Grimoire.GitHub        (getRevision)
+import Prelude                hiding (lookup)
+import Control.Monad                 (liftM)
+import Control.Monad.IO.Class        (MonadIO, liftIO)
+import Grimoire.GitHub               (getRevision)
 import Grimoire.Types
 
 import qualified Grimoire.Cache as C
@@ -29,11 +30,13 @@ type Key   = (Name, Version)
 type Cache = Cache_ Key Revision
 
 data Cache_ k v = Cache
-    { _cache :: C.AtomicCache k v
+    { _cache :: C.STMCache k v
     }
 
 instance C.Cache Cache_ Key Revision where
     lookup key (Cache cache) = C.lookup key cache
 
-new :: AppConfig -> IO Cache
-new conf = liftM Cache (C.atomically $ \(name, ver) -> getRevision name ver conf)
+new :: MonadIO io => AppConfig -> io Cache
+new conf = liftM Cache (C.newSTM ctor)
+  where
+    ctor (name, ver) = liftIO $ getRevision name ver conf
