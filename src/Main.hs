@@ -21,8 +21,7 @@ import System.IO
 import Grimoire.Handlers (site)
 import Grimoire.Config   (parseConfig)
 
-import qualified Grimoire.Cache.Archive  as A
-import qualified Grimoire.Cache.Revision as R
+import qualified Grimoire.Cache as C
 
 main :: IO ()
 main = do
@@ -35,10 +34,11 @@ main = do
 
     -- Extract the important shit
     let appConf = fromJust $ getOther httpConf
+    print appConf
 
     -- Setup type caches
-    revs <- R.new appConf
-    arcs <- A.new appConf
+    revs <- C.empty
+    tars <- C.empty
 
     -- Start the serve with the site handlers
-    httpServe httpConf $ site appConf revs arcs
+    httpServe httpConf $ site appConf revs tars

@@ -17,6 +17,7 @@ module Grimoire.GitHub (
     , getTarball
     ) where
 
+import Control.Monad (unless)
 import Control.Monad.IO.Class      (liftIO)
 import Data.String
 import Control.Applicative         ((<$>), (<*>), empty)
@@ -27,6 +28,8 @@ import Data.Maybe                  (fromJust)
 import Data.Vector                 (Vector, toList)
 import Network.HTTP.Conduit hiding (queryString, path)
 import Grimoire.Types
+import Data.Conduit.Binary          (sinkFile)
+import System.Directory             (doesFileExist, createDirectoryIfMissing)
 
 import qualified Data.Conduit as C
 import qualified Data.ByteString.Char8      as BS
@@ -77,22 +80,17 @@ getRevision name ver AppConfig{..} = do
     repo <- getRepository name _auth
     return $ toRevision repo ver _baseUri
 
-getTarball :: Name
-           -> Version
-           -> AppConfig
-           -> C.Sink BS.ByteString (C.ResourceT IO) ()
-           -> IO ()
-getTarball name ver AppConfig{..} sink = withManager $ \m -> do
-    liftIO . print $ BS.concat ["Tarball: ", uri]
-    res <- http (wrapAuth uri _auth) m
-    responseBody res C.$$+- sink
+getTarball :: Name -> Version -> AppConfig -> IO FilePath
+getTarball name ver AppConfig{..} = withManager $ \m -> do
+    p <- liftIO $ doesFileExist file
+    unless p $ do
+        liftIO $ createDirectoryIfMissing True dir
+        res <- http (wrapAuth url _auth) m
+        responseBody res C.$$+- sinkFile file
+    return file
   where
-    uri = BS.intercalate "/" [ "https://github.com"
-                             , orgStr _auth
-                             , name
-                             , "tarball"
-                             , versionStr ver
-                             ]
+    (file, dir) = archivePaths name ver _cacheDir
+    url         = tarball name ver _auth
 
 --
 -- Private
@@ -100,6 +98,15 @@ getTarball name ver AppConfig{..} sink = withManager $ \m -> do
 
 api :: BS.ByteString -> BS.ByteString
 api path = BS.concat ["https://api.github.com/", path]
+
+tarball :: Name -> Version -> Auth -> BS.ByteString
+tarball name ver a = BS.intercalate "/"
+    [ "https://github.com"
+    , orgStr a
+    , name
+    , "tarball"
+    , versionStr ver
+    ]
 
 getRepository :: Name -> Auth -> IO Repository
 getRepository name a = do
@@ -150,3 +157,10 @@ toRevision Repository{..} ver base = Revision
     , revCreated  = repoCreated
     , revUpdated  = repoUpdated
     }
+
+archivePaths :: Name -> Version -> BS.ByteString -> (FilePath, FilePath)
+archivePaths name ver dir = (BS.unpack pref, BS.unpack file)
+  where
+    join = BS.intercalate "/"
+    pref = join [dir, name]
+    file = join [pref, BS.concat [name, "-", encodeUri ver, ".tar.gz"]]

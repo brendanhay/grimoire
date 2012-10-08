@@ -29,14 +29,16 @@ import Grimoire.GitHub
 import Grimoire.Types
 
 import qualified Data.ByteString.Char8   as BS
-import qualified Grimoire.Cache.Revision as R
-import qualified Grimoire.Cache.Archive  as A
 
-site :: AppConfig -> R.Cache -> A.Cache -> Snap ()
-site conf revs arcs = method GET $ route
+type Key           = (Name, Version)
+type RevisionCache = Cache Key Revision
+type TarballCache  = Cache Key FilePath
+
+site :: AppConfig -> RevisionCache  -> TarballCache -> Snap ()
+site conf revs tars = method GET $ route
     [ ("cookbooks/:name", overview conf)
     , ("cookbooks/:name/versions/:version", revision conf revs)
-    , ("cookbooks/:name/versions/:version/archive", archive conf arcs)
+    , ("cookbooks/:name/versions/:version/archive", archive conf tars)
     ]
 
 --
@@ -49,18 +51,18 @@ overview conf = do
     over <- liftIO $ getOverview name conf
     writeJson over
 
-revision :: AppConfig -> R.Cache -> Snap ()
-revision _ cache = do
+revision :: AppConfig -> RevisionCache -> Snap ()
+revision conf cache = do
     name <- requireParam "name"
     ver  <- requireParam "version"
-    rev  <- liftIO $ lookup (name, ver) cache
+    rev  <- withCache cache (getRevision name ver conf) (name, ver)
     writeJson rev
 
-archive :: AppConfig -> A.Cache -> Snap ()
+archive :: AppConfig -> TarballCache -> Snap ()
 archive conf cache = do
     name <- requireParam "name"
     ver  <- requireParam "version"
-    file <- liftIO $ lookup ((ArchiveUri $ _baseUri conf name) ver) cache
+    file <- withCache cache (getTarball name ver conf) (name, ver)
     setDisposition file
     serveFile file
 

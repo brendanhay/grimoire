@@ -11,13 +11,10 @@
 --
 
 module Grimoire.Cache (
-    -- * Type Class
-      Cache
-    , lookup
-
     -- * Restricted Constructors
-    , STMCache
-    , withSTM
+      Cache
+    , empty
+    , withCache
     ) where
 
 import Prelude                hiding (lookup)
@@ -27,46 +24,39 @@ import Control.Concurrent.STM
 
 import qualified Data.Map as M
 
-class Ord k => Cache c k v where
-    lookup :: (Ord k) => k -> c k v -> IO v
+type Lock v        = MVar (Maybe v)
+type LockStore k v = TVar (M.Map k (Lock v))
 
-type Ctor k v = k -> IO v
-
-type Lock  v = Maybe v
-type MLock v = MVar (Lock v)
-
-type LockStore  k v = M.Map k (MLock v)
-type TLockStore k v = TVar (LockStore k v)
-
-data STMCache k v = STMCache
-    { _store :: TLockStore k v
-    , _ctor  :: k -> IO v
+data Cache k v = Cache
+    { _store :: LockStore k v
     }
 
-instance Ord k => Cache STMCache k v where
-    lookup key STMCache{..} = withStore key _store _ctor
+-- type Cache k v = ReaderT (Cache k v) IO
 
-newSTM :: MonadIO io => Ctor k v -> io (STMCache k v)
-newSTM ctor = liftIO . atomically $ do
+empty :: (MonadIO m, Eq k, Ord k) => m (Cache k v)
+empty = liftIO . atomically $ do
     store <- newTVar M.empty
-    return $ STMCache store ctor
+    return $ Cache store
+
+withCache :: (MonadIO m, Eq k, Ord k) => Cache k v -> IO v -> k -> m v
+withCache cache = withStore (_store cache)
 
 --
 -- Private
 --
 
-withStore :: (MonadIO io, Ord k) => k -> TLockStore k v -> Ctor k v -> io v
-withStore key store ctor = do
-    lock <- findLock key store
-    liftIO $ modifyMVar lock (\v -> do val <- mcons v; return (Just val, val))
+withStore :: (MonadIO m, Ord k) => LockStore k v -> IO v -> k -> m v
+withStore store io key = findLock store key >>= liftIO . flip modifyMVar lookup
   where
-    mcons Nothing  = ctor key
-    mcons (Just v) = return v
+    lookup lock = do
+        val <- case lock of
+            Just v  -> return v
+            Nothing -> io
+        return (Just val, val)
 
-findLock :: (MonadIO io, Ord k) => k -> TLockStore k v -> io (MLock v)
-findLock key store = liftIO $ do
-    locks          <- atomically $ readTVar store
-    (locks', lock) <- find locks
+findLock :: (MonadIO m, Ord k) => LockStore k v -> k -> m (Lock v)
+findLock store key = liftIO $ do
+    (locks', lock) <- atomically (readTVar store) >>= find
     seq locks' . atomically $ writeTVar store locks'
     return lock
   where

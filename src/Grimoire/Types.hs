@@ -134,12 +134,12 @@ instance Default Auth where
 instance Monoid Auth where
     mempty      = Auth def def def
     mappend a b = Auth
-        { _authOrg  = ov _authOrg
-        , _authUser = ov _authUser
-        , _authPass = ov _authPass
+        { _authOrg  = f def _authOrg
+        , _authUser = rappend def (_authUser a) (_authUser b)
+        , _authPass = f def _authPass
         }
       where
-        ov f = (rappend def `on` f) a b
+        f d g = (rappend d `on` g) a b
 
 rappend :: Eq a => a -> a -> a -> a
 rappend d x y | x == d    = y
@@ -177,9 +177,6 @@ versionStr (Version bs) = BS.map fn bs
 
 class SafeUri a where
     encodeUri :: a -> BS.ByteString
-
-instance Show BaseUri where
-   show _ = "BaseUri(name -> uri)"
 
 data Uri = Uri
     { _uriHost     :: BS.ByteString
@@ -246,25 +243,28 @@ type BaseUri = Name -> Uri
 instance Eq BaseUri where
     a == b = (a "") == (b "")
 
+instance Show BaseUri where
+    show _ = "<#BaseUri>"
+
 data AppConfig = AppConfig
     { _auth     :: Auth
     , _cacheDir :: BS.ByteString
     , _baseUri  :: BaseUri
-    }
+    } deriving (Show)
 
 $(makeLenses ''AppConfig)
 
 -- | Basterdised non-associative monoid instance to satisfy
 -- configuration parsing
 instance Monoid AppConfig where
-    mempty      = AppConfig def ".cache" def
+    mempty      = AppConfig mempty ".cache" def
     mappend a b = AppConfig
-        { _auth     = f def _auth
+        { _auth     = mempty
         , _cacheDir = f ".cache" _cacheDir
         , _baseUri  = f def _baseUri
         }
       where
-        f d g = rappend (g a) (g b) d
+        f d g = (rappend d `on` g) a b
 
 --
 -- Time
