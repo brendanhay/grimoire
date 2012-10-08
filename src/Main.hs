@@ -15,22 +15,22 @@ module Main (
       main
     ) where
 
-import Prelude                hiding (lookup)
-import Control.Monad                 (liftM)
-import Control.Monad.IO.Class        (liftIO)
-import Data.Aeson                    (ToJSON, encode)
-import Data.Maybe        (fromJust)
-import Data.String                   (IsString(..))
+import Prelude                 hiding (lookup)
+import Control.Monad                  (liftM)
+import Control.Monad.IO.Class         (liftIO)
+import Data.Aeson                     (ToJSON, encode)
+import Data.Maybe                     (fromJust)
+import Data.String                    (IsString(..))
 import Snap.Core
-import Snap.Http.Server hiding (Config)
-import Snap.Util.FileServe           (serveFile)
+import Snap.Http.Server        hiding (Config)
+import Snap.Util.FileServe            (serveFile)
 import System.IO
 import Grimoire.Cache
-import Grimoire.Config   (parseConfig)
+import Grimoire.Config                (parseConfig)
 import Grimoire.GitHub
 import Grimoire.Types
 
-import qualified Data.ByteString.Char8   as BS
+import qualified Data.ByteString.Char8 as BS
 
 type Key           = (Name, Version)
 type RevisionCache = Cache Key Revision

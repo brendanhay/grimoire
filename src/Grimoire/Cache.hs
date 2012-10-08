@@ -18,28 +18,24 @@ module Grimoire.Cache (
     ) where
 
 import Prelude                hiding (lookup)
+import Control.Monad                 (liftM)
 import Control.Monad.IO.Class        (MonadIO, liftIO)
 import Control.Concurrent
 import Control.Concurrent.STM
 
 import qualified Data.Map as M
 
-type Lock v        = MVar (Maybe v)
-type LockStore k v = TVar (M.Map k (Lock v))
+type MValue v = MVar (Maybe v)
+type TMap k v = TVar (M.Map k (MValue v))
 
-newtype Cache k v  = Cache (LockStore k v)
+newtype Cache k v  = Cache (TMap k v)
 
-instance Show (Cache k v) where
-    show _ = "<#Cache>"
+newCache :: (MonadIO m, Ord k) => m (Cache k v)
+newCache = liftIO . atomically $ liftM Cache (newTVar M.empty)
 
-newCache :: (MonadIO m, Eq k, Ord k) => m (Cache k v)
-newCache = liftIO . atomically $ do
-    store <- newTVar M.empty
-    return $ Cache store
-
-withCache :: (MonadIO m, Eq k, Ord k) => Cache k v -> IO v -> k -> m v
-withCache (Cache store) io key = do
-    lock <- findLock store key
+withCache :: (MonadIO m, Ord k) => Cache k v -> IO v -> k -> m v
+withCache (Cache tvar) io key = do
+    lock <- findMValue tvar key
     liftIO $ modifyMVar lock lookup
   where
     lookup l = do
@@ -52,10 +48,10 @@ withCache (Cache store) io key = do
 -- Private
 --
 
-findLock :: (MonadIO m, Ord k) => LockStore k v -> k -> m (Lock v)
-findLock store key = liftIO $ do
-    (locks, lock) <- atomically (readTVar store) >>= lookup
-    seq locks . atomically $ writeTVar store locks
+findMValue :: (MonadIO m, Ord k) => TMap k v -> k -> m (MValue v)
+findMValue tvar key = liftIO $ do
+    (locks, lock) <- atomically (readTVar tvar) >>= lookup
+    seq locks . atomically $ writeTVar tvar locks
     return lock
   where
     lookup ls = case M.lookup key ls of
