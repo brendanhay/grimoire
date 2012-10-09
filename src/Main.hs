@@ -17,7 +17,7 @@ module Main (
 
 import Prelude                 hiding (lookup, catch)
 import Control.Monad                  (liftM)
-import Control.Monad.CatchIO
+import Control.Monad.CatchIO          (catch, throw)
 import Control.Monad.IO.Class         (liftIO)
 import Data.Aeson                     (ToJSON, encode, object, (.=))
 import Data.Maybe                     (fromJust)
@@ -27,9 +27,9 @@ import Network.HTTP.Types             (Status(..))
 import Snap.Core
 import Snap.Http.Server        hiding (Config)
 import Snap.Util.FileServe            (serveFile)
-import System.IO
+import System.IO                      (BufferMode(..), stdout, hSetBuffering)
 import Grimoire.Cache
-import Grimoire.Config                (parseConfig)
+import Grimoire.Config
 import Grimoire.GitHub
 import Grimoire.Types
 
