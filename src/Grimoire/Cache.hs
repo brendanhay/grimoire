@@ -11,9 +11,11 @@
 --
 
 module Grimoire.Cache (
-    -- * Restricted Constructors
+    -- * Restricted Constructor
       Cache
     , newCache
+
+    -- * Functions
     , withCache
     ) where
 
@@ -28,14 +30,15 @@ import qualified Data.Map as M
 type MValue v = MVar (Maybe v)
 type TMap k v = TVar (M.Map k (MValue v))
 
-newtype Cache k v  = Cache (TMap k v)
+newtype Cache k v = Cache (TMap k v)
 
 newCache :: (MonadIO m, Ord k) => m (Cache k v)
 newCache = liftIO . atomically $ Cache `liftM` (newTVar M.empty)
 
 withCache :: (MonadIO m, Ord k) => Cache k v -> IO v -> k -> m v
-withCache (Cache tvar) io key =
-    lookup tvar key >>= liftIO . flip modifyMVar cons
+withCache (Cache tvar) io key = do
+    v <- lookup tvar key
+    liftIO $ modifyMVar v cons
   where
     cons v = do
         y <- case v of

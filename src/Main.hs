@@ -15,12 +15,15 @@ module Main (
       main
     ) where
 
-import Prelude                 hiding (lookup)
+import Prelude                 hiding (lookup, catch)
 import Control.Monad                  (liftM)
+import Control.Monad.CatchIO
 import Control.Monad.IO.Class         (liftIO)
-import Data.Aeson                     (ToJSON, encode)
+import Data.Aeson                     (ToJSON, encode, object, (.=))
 import Data.Maybe                     (fromJust)
 import Data.String                    (IsString(..))
+import Network.HTTP.Conduit           (HttpException(..))
+import Network.HTTP.Types             (Status(..))
 import Snap.Core
 import Snap.Http.Server        hiding (Config)
 import Snap.Util.FileServe            (serveFile)
@@ -61,13 +64,13 @@ main = do
 --
 
 site :: Config -> RevisionCache -> TarballCache -> Snap ()
-site conf revs tars = method GET . route $ map f
+site conf revs tars = method GET . route $ map runHandler
     [ ("cookbooks/:name", overview)
     , ("cookbooks/:name/versions/:version", revision revs)
     , ("cookbooks/:name/versions/:version/archive", archive tars)
     ]
   where
-    f (r, h) = (r, h conf)
+    runHandler (r, h) = (r, h conf `catch` handleException)
 
 overview :: Config -> Snap ()
 overview conf = do
@@ -93,6 +96,21 @@ archive cache conf = do
 --
 -- Helpers
 --
+
+handleException :: HttpException -> Snap ()
+handleException e = do
+    modifyResponse $ setResponseStatus code msg
+    writeJson $ object [ "error" .= msg ]
+    getResponse >>= finishWith
+  where
+    (code, msg) = parseException e
+
+parseException :: HttpException -> (Int, BS.ByteString)
+parseException e = case e of
+    (StatusCodeException Status{..} _) -> (statusCode, statusMessage)
+    (InvalidUrlException _ msg)         -> (404, BS.pack msg)
+    (HttpParserException msg)           -> (500, BS.pack msg)
+    _                                   -> (500, "server error")
 
 writeJson :: ToJSON j => j -> Snap ()
 writeJson = writeLBS . encode
@@ -120,8 +138,7 @@ instance RequiredParam BS.ByteString where
     requireParam name = do
         val <- getParam name
         case val of
-            Just param -> return param
-            _ -> do
-                modifyResponse $ setResponseStatus 400 ("Missing param " `BS.append` name)
-                writeBS "400 Missing param"
-                getResponse >>= finishWith
+            Just param ->
+                return param
+            _ ->
+                throw $ InvalidUrlException "" ("Missing param " ++ BS.unpack name)

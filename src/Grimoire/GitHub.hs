@@ -11,7 +11,7 @@
 --
 
 module Grimoire.GitHub (
-    -- * Functions
+    -- * Http Requests
       getOverview
     , getRevision
     , getTarball
