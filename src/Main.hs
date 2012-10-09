@@ -27,7 +27,7 @@ import Network.HTTP.Types             (Status(..))
 import Snap.Core
 import Snap.Http.Server        hiding (Config)
 import Snap.Util.FileServe            (serveFile)
-import System.IO                      (BufferMode(..), stdout, hSetBuffering)
+import System.IO
 import Grimoire.Cache
 import Grimoire.Config
 import Grimoire.GitHub
@@ -41,22 +41,22 @@ type TarballCache  = Cache Key FilePath
 
 main :: IO ()
 main = do
-    -- Ensure foreman flushes stdout
+    putStrLn ""
+
+    mode <- hGetBuffering stdout
     hSetBuffering stdout NoBuffering
 
-    -- Get some command line args
     httpConf <- parseConfig
     print httpConf
 
-    -- Extract the important shit
     let appConf = fromJust $ getOther httpConf
     print appConf
 
-    -- Setup type caches
+    hSetBuffering stdout mode
+
     revs <- newCache
     tars <- newCache
 
-    -- Start the serve with the site handlers
     httpServe httpConf $ site appConf revs tars
 
 --

@@ -112,7 +112,7 @@ newtype Password = Password BS.ByteString
     deriving (Eq)
 
 instance Show Password where
-    show _ = "Password *****"
+    show _ = "Password \"*****\""
 
 instance Default Password where
     def = "password"
@@ -307,18 +307,16 @@ instance Eq BaseUri where
     a == b = a "" == b ""
 
 instance Show BaseUri where
-    show _ = "BaseUri (Name -> Uri)"
+    show u = "BaseUri \"" ++ (BS.unpack . encodeUri $ u "<cookbook>\"")
 
 data Config = Config
     { _auth      :: Auth
     , _cacheDir  :: BS.ByteString
     , _baseUri   :: BaseUri
-    } deriving (Show)
+    }
 
 $(makeLenses ''Config)
 
--- | Basterdised non-associative monoid instance to satisfy
--- configuration parsing
 instance Monoid Config where
     mempty      = Config mempty ".cache" def
     mappend a b = a
@@ -328,3 +326,18 @@ instance Monoid Config where
         }
       where
         f d g = (rappend d `on` g) a b
+
+instance Show Config where
+    show Config{..} = unlines [ "Grimoire:"
+                              , "org: "   ++ org
+                              , "user: "  ++ user
+                              , "pass: "  ++ pass
+                              , "cache: " ++ cache
+                              , "uri: "   ++ uri
+                              ]
+      where
+        org   = show $ _authOrg _auth
+        user  = show $ _authUser _auth
+        pass  = show $ _authPass _auth
+        cache = show $ BS.concat ["./" `BS.append` _cacheDir, "/<cookbook>"]
+        uri   = show $ _baseUri
