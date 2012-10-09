@@ -138,7 +138,7 @@ instance RequiredParam BS.ByteString where
     requireParam name = do
         val <- getParam name
         case val of
-            Just param ->
-                return param
-            _ ->
-                throw $ InvalidUrlException "" ("Missing param " ++ BS.unpack name)
+            Just param -> return param
+            Nothing    -> throw e
+      where
+        e = InvalidUrlException "" $ "Missing param " ++ BS.unpack name
