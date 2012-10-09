@@ -339,5 +339,5 @@ instance Show Config where
         org   = show $ _authOrg _auth
         user  = show $ _authUser _auth
         pass  = show $ _authPass _auth
-        cache = show $ BS.concat ["./" `BS.append` _cacheDir, "/<cookbook>"]
+        cache = show $ "./" `BS.append` _cacheDir
         uri   = show $ _baseUri
