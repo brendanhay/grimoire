@@ -116,6 +116,7 @@ getRepository name a = do
 getVersions :: Name -> Auth -> IO [Version]
 getVersions name a = do
     tags' <- getTags name a
+    print tags'
     return . map (fromString . BS.unpack . tagName) $ sort tags'
 
 getTags :: Name -> Auth -> IO [Tag]

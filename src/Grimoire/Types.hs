@@ -109,7 +109,10 @@ userStr :: Auth -> BS.ByteString
 userStr = (\(User bs) -> bs) . _authUser
 
 newtype Password = Password BS.ByteString
-    deriving (Show, Eq)
+    deriving (Eq)
+
+instance Show Password where
+    show _ = "Password *****"
 
 instance Default Password where
     def = "password"
@@ -304,7 +307,7 @@ instance Eq BaseUri where
     a == b = a "" == b ""
 
 instance Show BaseUri where
-    show _ = "<#BaseUri>"
+    show _ = "BaseUri (Name -> Uri)"
 
 data Config = Config
     { _auth      :: Auth
