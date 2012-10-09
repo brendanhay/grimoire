@@ -107,8 +107,8 @@ handleException e = do
 
 parseException :: HttpException -> (Int, BS.ByteString)
 parseException e = case e of
-    (StatusCodeException Status{..} _) -> (statusCode, statusMessage)
-    (InvalidUrlException _ msg)         -> (404, BS.pack msg)
+    (StatusCodeException Status{..} _)  -> (statusCode, statusMessage)
+    (InvalidUrlException _ msg)         -> (400, BS.pack msg)
     (HttpParserException msg)           -> (500, BS.pack msg)
     _                                   -> (500, "server error")
 
